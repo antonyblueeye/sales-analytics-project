@@ -22,7 +22,7 @@ export default function Sidebar() {
     return (
         <aside className="fixed left-0 top-0 h-screen w-64 bg-gradient-to-b from-gray-900 to-gray-800 text-white shadow-xl">
             <div className="p-6">
-                <h1 className="text-2xl font-bold tracking-tight">MeetAlfred</h1>
+                <h1 className="text-2xl font-bold tracking-tight">Sales Analytics</h1>
                 <p className="text-xs text-gray-400 mt-1">Analytics Dashboard</p>
             </div>
             <nav className="mt-8 px-4 space-y-2">
