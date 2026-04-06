@@ -7,12 +7,14 @@ import {
     Mail,
     Settings,
     TrendingUp,
+    Calendar,
 } from 'lucide-react';
 
 const navItems = [
     { name: 'Analytics Overview', href: '/', icon: LayoutDashboard },
     { name: 'Leads Analytics', href: '/leads', icon: Users },
     { name: 'Responses Analytics', href: '/responses', icon: Mail },
+    { name: 'Log Activity', href: '/log-activity', icon: Calendar },
     { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
@@ -48,7 +50,7 @@ export default function Sidebar() {
             </nav>
             <div className="absolute bottom-6 left-0 right-0 px-4">
                 <div className="border-t border-gray-700 pt-4 text-xs text-gray-500 text-center">
-                    <p>© 2025 MeetAlfred</p>
+                    <p>© 2026 Sales Analytics</p>
                 </div>
             </div>
         </aside>

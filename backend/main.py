@@ -1,12 +1,14 @@
 from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
+from sqlalchemy import text, and_
 from sqlalchemy.orm import Session
 from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
 from models import Base, Campaign, Profile, Lead, Action
 from analytics import get_total_actions, get_total_leads
+from typing import Optional
+from datetime import datetime, time, timedelta
 
 app = FastAPI()
 
@@ -97,11 +99,35 @@ def sync_all(db: Session = Depends(get_db)):
     return {"status": "ok", "results": result}
 
 @app.get("/analytics/total-actions")
-def total_actions(db: Session = Depends(get_db)):
-    count = get_total_actions(db)
+def total_actions(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    # Преобразуем строки в datetime
+    from_dt = None
+    to_dt = None
+    if from_date:
+        from_dt = datetime.strptime(from_date, "%Y-%m-%d")
+    if to_date:
+        # Добавляем один день, чтобы включить весь выбранный день
+        to_dt = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
+    
+    count = get_total_actions(db, from_dt, to_dt)
     return {"total_actions": count}
 
 @app.get("/analytics/total-leads")
-def total_leads(db: Session = Depends(get_db)):
-    count = get_total_leads(db)
+def total_leads(
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    from_dt = None
+    to_dt = None
+    if from_date:
+        from_dt = datetime.strptime(from_date, "%Y-%m-%d")
+    if to_date:
+        to_dt = datetime.strptime(to_date, "%Y-%m-%d") + timedelta(days=1)
+    
+    count = get_total_leads(db, from_dt, to_dt)
     return {"total_leads": count}
