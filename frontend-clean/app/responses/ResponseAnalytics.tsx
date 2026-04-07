@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import DateRangePicker from '../components/DateRangePicker';
+import CustomSelect from '../components/CustomSelect';
+import { Target, MapPin } from 'lucide-react';
 
 const ResponseCharts = dynamic(() => import('../components/charts/ResponseCharts'), { 
   ssr: false,
@@ -29,15 +31,25 @@ export default function ResponseAnalytics() {
         <div className="space-y-6">
             <div className="flex flex-wrap justify-between gap-4 items-center">
                 <div className="flex gap-4">
-                    <select value={selectedCampaign} onChange={e => setSelectedCampaign(e.target.value)} className="px-3 py-2 border border-slate-600 bg-slate-800 text-slate-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="all">All campaigns</option>
-                        <option value="camp1">Campaign A</option>
-                    </select>
-                    <select value={location} onChange={e => setLocation(e.target.value)} className="px-3 py-2 border border-slate-600 bg-slate-800 text-slate-100 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="all">All locations</option>
-                        <option value="US">United States</option>
-                        <option value="UK">United Kingdom</option>
-                    </select>
+                    <CustomSelect
+                        value={selectedCampaign}
+                        onChange={setSelectedCampaign}
+                        options={[
+                            { value: 'all', label: 'All campaigns' },
+                            { value: 'camp1', label: 'Campaign A' },
+                        ]}
+                        icon={<Target size={16} />}
+                    />
+                    <CustomSelect
+                        value={location}
+                        onChange={setLocation}
+                        options={[
+                            { value: 'all', label: 'All locations' },
+                            { value: 'US', label: 'United States' },
+                            { value: 'UK', label: 'United Kingdom' },
+                        ]}
+                        icon={<MapPin size={16} />}
+                    />
                 </div>
                 <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
             </div>

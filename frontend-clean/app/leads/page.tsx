@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import DateRangePicker from '../components/DateRangePicker';
+import CustomSelect from '../components/CustomSelect';
+import { Target } from 'lucide-react';
 
 const LeadsCharts = dynamic(() => import('../components/charts/LeadsCharts'), { 
   ssr: false,
@@ -38,15 +40,16 @@ export default function LeadsAnalytics() {
             <div className="flex justify-between items-center flex-wrap gap-4">
                 <h1 className="text-2xl font-bold">Leads Analytics</h1>
                 <div className="flex gap-4 items-center">
-                    <select
+                    <CustomSelect
                         value={selectedCampaign}
-                        onChange={(e) => setSelectedCampaign(e.target.value)}
-                        className="px-3 py-2 border rounded-lg bg-slate-800 text-slate-100"
-                    >
-                        <option value="all">All campaigns</option>
-                        <option value="camp1">Campaign A</option>
-                        <option value="camp2">Campaign B</option>
-                    </select>
+                        onChange={setSelectedCampaign}
+                        options={[
+                            { value: 'all', label: 'All campaigns' },
+                            { value: 'camp1', label: 'Campaign A' },
+                            { value: 'camp2', label: 'Campaign B' }
+                        ]}
+                        icon={<Target size={16} />}
+                    />
                     <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
                 </div>
             </div>

@@ -40,7 +40,7 @@ export default function ListOfResponses() {
 
     return (
         <div>
-            <div className="col-span-12 xl:col-span-4 space-y-4">
+            <div className="col-span-12 xl:col-span-4 mb-6">
                 <input
                     type="text"
                     placeholder="Search by name, company..."

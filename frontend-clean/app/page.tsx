@@ -30,13 +30,31 @@ const dailyData = [
 // Данные для гистограммы (инвайты vs принятые)
 const barData = profilesData.map(p => ({ name: p.name, invites: p.invites, accepted: p.accepted }));
 
+// Вычисляем Итого
+const totals = profilesData.reduce((acc, curr) => {
+  acc.invites += curr.invites;
+  acc.accepted += curr.accepted;
+  acc.messages += curr.messages;
+  acc.replies += curr.replies;
+  acc.interested += curr.interested;
+  acc.calls += curr.calls;
+  acc.mql += curr.mql;
+  acc.sql += curr.sql;
+  acc.partner += curr.partner;
+  acc.clients += curr.clients;
+  return acc;
+}, { invites: 0, accepted: 0, messages: 0, replies: 0, interested: 0, calls: 0, mql: 0, sql: 0, partner: 0, clients: 0 });
+
+const totalAcceptRate = ((totals.accepted / totals.invites) * 100).toFixed(1);
+const totalReplyRate = ((totals.replies / totals.messages) * 100).toFixed(1);
+
 export default function Dashboard() {
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 3600000));
   const [endDate, setEndDate] = useState(new Date());
 
   return (
     <div className="p-6 space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <h1 className="text-2xl font-bold">Analytics Overview</h1>
         <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
       </div>
@@ -63,23 +81,40 @@ export default function Dashboard() {
           </thead>
           <tbody>
             {profilesData.map(profile => (
-              <tr key={profile.name} className="border-t">
-                <td className="px-4 py-2 font-medium">{profile.name}</td>
-                <td className="px-4 py-2 text-right">{profile.invites}</td>
-                <td className="px-4 py-2 text-right">{profile.accepted}</td>
-                <td className="px-4 py-2 text-right">{profile.acceptRate}%</td>
-                <td className="px-4 py-2 text-right">{profile.messages}</td>
-                <td className="px-4 py-2 text-right">{profile.replies}</td>
-                <td className="px-4 py-2 text-right">{profile.replyRate}%</td>
-                <td className="px-4 py-2 text-right">{profile.interested}</td>
-                <td className="px-4 py-2 text-right">{profile.calls}</td>
-                <td className="px-4 py-2 text-right">{profile.mql}</td>
-                <td className="px-4 py-2 text-right">{profile.sql}</td>
-                <td className="px-4 py-2 text-right">{profile.partner}</td>
-                <td className="px-4 py-2 text-right">{profile.clients}</td>
+              <tr key={profile.name} className="border-t border-slate-700 hover:bg-slate-700/60 transition-colors cursor-pointer">
+                <td className="px-4 py-3 font-medium">{profile.name}</td>
+                <td className="px-4 py-3 text-right">{profile.invites}</td>
+                <td className="px-4 py-3 text-right">{profile.accepted}</td>
+                <td className="px-4 py-3 text-right">{profile.acceptRate}%</td>
+                <td className="px-4 py-3 text-right">{profile.messages}</td>
+                <td className="px-4 py-3 text-right">{profile.replies}</td>
+                <td className="px-4 py-3 text-right">{profile.replyRate}%</td>
+                <td className="px-4 py-3 text-right">{profile.interested}</td>
+                <td className="px-4 py-3 text-right">{profile.calls}</td>
+                <td className="px-4 py-3 text-right">{profile.mql}</td>
+                <td className="px-4 py-3 text-right">{profile.sql}</td>
+                <td className="px-4 py-3 text-right">{profile.partner}</td>
+                <td className="px-4 py-3 text-right">{profile.clients}</td>
               </tr>
             ))}
           </tbody>
+          <tfoot className="bg-slate-700/80 font-bold text-slate-100 border-t-2 border-slate-600">
+            <tr>
+              <td className="px-4 py-4 text-left">Total / Avg</td>
+              <td className="px-4 py-4 text-right">{totals.invites}</td>
+              <td className="px-4 py-4 text-right">{totals.accepted}</td>
+              <td className="px-4 py-4 text-right">{totalAcceptRate}%</td>
+              <td className="px-4 py-4 text-right">{totals.messages}</td>
+              <td className="px-4 py-4 text-right">{totals.replies}</td>
+              <td className="px-4 py-4 text-right">{totalReplyRate}%</td>
+              <td className="px-4 py-4 text-right">{totals.interested}</td>
+              <td className="px-4 py-4 text-right">{totals.calls}</td>
+              <td className="px-4 py-4 text-right">{totals.mql}</td>
+              <td className="px-4 py-4 text-right">{totals.sql}</td>
+              <td className="px-4 py-4 text-right">{totals.partner}</td>
+              <td className="px-4 py-4 text-right">{totals.clients}</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
 
