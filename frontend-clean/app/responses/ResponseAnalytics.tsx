@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import CalendarPicker from '../components/CalendarPicker';
+import DateRangePicker from '../components/DateRangePicker';
 
 const ResponseCharts = dynamic(() => import('../components/charts/ResponseCharts'), { 
   ssr: false,
@@ -39,7 +39,7 @@ export default function ResponseAnalytics() {
                         <option value="UK">United Kingdom</option>
                     </select>
                 </div>
-                <CalendarPicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
+                <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
             </div>
 
             <ResponseCharts replyTypeData={replyTypeData} topMessagesData={topMessagesData} />

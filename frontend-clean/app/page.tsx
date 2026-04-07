@@ -1,9 +1,9 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import CalendarPicker from './components/CalendarPicker';
+import DateRangePicker from './components/DateRangePicker';
 
-const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), { 
+const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
   ssr: false,
   loading: () => <div className="h-[600px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading charts...</div>
 });
@@ -38,7 +38,7 @@ export default function Dashboard() {
     <div className="p-6 space-y-8">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold">Analytics Overview</h1>
-        <CalendarPicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
+        <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
       </div>
 
       {/* Таблица профилей */}

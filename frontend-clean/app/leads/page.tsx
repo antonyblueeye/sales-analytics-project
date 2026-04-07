@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import dynamic from 'next/dynamic';
-import CalendarPicker from '../components/CalendarPicker';
+import DateRangePicker from '../components/DateRangePicker';
 
 const LeadsCharts = dynamic(() => import('../components/charts/LeadsCharts'), { 
   ssr: false,
@@ -47,7 +47,7 @@ export default function LeadsAnalytics() {
                         <option value="camp1">Campaign A</option>
                         <option value="camp2">Campaign B</option>
                     </select>
-                    <CalendarPicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
+                    <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
                 </div>
             </div>
 
