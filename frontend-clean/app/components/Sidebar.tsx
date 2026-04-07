@@ -49,7 +49,7 @@ export default function Sidebar() {
                 })}
             </nav>
             <div className="absolute bottom-6 left-0 right-0 px-4">
-                <div className="border-t border-gray-700 pt-4 text-xs text-gray-500 text-center">
+                <div className="border-t border-gray-700 pt-4 text-xs text-slate-400 text-center">
                     <p>© 2026 Sales Analytics</p>
                 </div>
             </div>

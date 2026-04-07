@@ -40,18 +40,19 @@ export default function ListOfResponses() {
 
     return (
         <div>
-            <div className="mb-4">
+            <div className="col-span-12 xl:col-span-4 space-y-4">
                 <input
                     type="text"
-                    placeholder="Search by name, company or title..."
+                    placeholder="Search by name, company..."
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-700 bg-slate-800 text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
                 />
             </div>
             <div className="space-y-4">
                 {filtered.map(response => (
-                    <div key={response.id} className="bg-white rounded-xl shadow p-4 flex gap-4">
+                    <div key={response.id} className="bg-slate-800 text-slate-100 rounded-xl shadow p-4 flex gap-4">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={response.photo} alt={response.name} className="w-12 h-12 rounded-full object-cover" />
                         <div className="flex-1">
                             <div className="flex justify-between items-start">
@@ -62,14 +63,14 @@ export default function ListOfResponses() {
                                             <Link2 size={16} className="text-blue-600" />
                                         </a>
                                     </h3>
-                                    <p className="text-sm text-gray-500">{response.title} at {response.company}</p>
+                                    <p className="text-sm text-slate-400">{response.title} at {response.company}</p>
                                     <p className="text-sm text-gray-400">{response.location}</p>
                                 </div>
-                                <span className={`px-2 py-1 text-xs rounded-full ${response.type === 'interested' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                <span className={`px-2 py-1 text-xs rounded-full ${response.type === 'interested' ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'}`}>
                                     {response.type === 'interested' ? 'Interested' : 'No need'}
                                 </span>
                             </div>
-                            <div className="mt-2 p-3 bg-gray-50 rounded-lg italic text-gray-700">
+                            <div className="mt-2 p-3 bg-slate-700 rounded-lg italic text-slate-300">
                                 “{response.message}”
                             </div>
                         </div>

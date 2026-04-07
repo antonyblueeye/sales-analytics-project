@@ -8,16 +8,16 @@ export default function ResponsesPage() {
 
     return (
         <div className="p-6">
-            <div className="flex gap-4 border-b mb-6">
+            <div className="flex gap-2 mb-6 bg-slate-800 p-1 rounded-lg w-fit">
                 <button
                     onClick={() => setActiveTab('list')}
-                    className={`px-4 py-2 font-medium ${activeTab === 'list' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500'}`}
+                    className={`px-5 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'list' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'}`}
                 >
                     List of Responses
                 </button>
                 <button
                     onClick={() => setActiveTab('analytics')}
-                    className={`px-4 py-2 font-medium ${activeTab === 'analytics' ? 'border-b-2 border-indigo-600 text-indigo-600' : 'text-gray-500'}`}
+                    className={`px-5 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'analytics' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700'}`}
                 >
                     Response Analytics
                 </button>

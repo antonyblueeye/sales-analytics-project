@@ -59,12 +59,12 @@ export default function LogActivity() {
                     placeholder="Search by name or company..."
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-2 border border-slate-700 bg-slate-800 text-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-400"
                 />
             </div>
-            <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="bg-slate-800 text-slate-100 rounded-xl shadow overflow-hidden">
                 <table className="min-w-full">
-                    <thead className="bg-gray-100">
+                    <thead className="bg-slate-700 text-slate-200">
                         <tr>
                             <th className="px-4 py-2 text-left">Lead</th>
                             <th className="px-4 py-2 text-left">Company</th>
@@ -76,6 +76,7 @@ export default function LogActivity() {
                         {filteredLeads.map((lead) => (
                             <tr key={lead.id} className="border-t">
                                 <td className="px-4 py-2 flex items-center gap-2">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
                                     <img src={lead.photo} className="w-8 h-8 rounded-full" alt={lead.name} />
                                     {lead.name}
                                 </td>
@@ -98,7 +99,7 @@ export default function LogActivity() {
             {/* Модальное окно */}
             {showModal && selectedLead && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-xl p-6 w-96">
+                    <div className="bg-slate-800 text-slate-100 rounded-xl p-6 w-96">
                         <h2 className="text-xl font-bold mb-4">Log activity for {selectedLead.name}</h2>
                         <div className="space-y-4">
                             <div>
@@ -108,7 +109,7 @@ export default function LogActivity() {
                                         <button
                                             key={type.value}
                                             onClick={() => setSelectedType(type.value)}
-                                            className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm ${selectedType === type.value ? 'bg-indigo-50 border-indigo-500' : 'border-gray-300'
+                                            className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm ${selectedType === type.value ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-600 hover:bg-slate-700 text-slate-300'
                                                 }`}
                                         >
                                             <type.icon size={16} />
@@ -123,11 +124,11 @@ export default function LogActivity() {
                                     type="date"
                                     value={activityDate}
                                     onChange={(e) => setActivityDate(e.target.value)}
-                                    className="w-full border rounded-lg px-3 py-2"
+                                    className="w-full border border-slate-700 bg-slate-900 text-slate-100 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>
                             <div className="flex justify-end gap-2 pt-4">
-                                <button onClick={() => setShowModal(false)} className="px-4 py-2 border rounded-lg">
+                                <button onClick={() => setShowModal(false)} className="px-4 py-2 border border-slate-700 hover:bg-slate-700 rounded-lg">
                                     Cancel
                                 </button>
                                 <button onClick={saveActivity} className="px-4 py-2 bg-indigo-600 text-white rounded-lg">

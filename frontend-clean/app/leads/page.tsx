@@ -1,7 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import dynamic from 'next/dynamic';
 import CalendarPicker from '../components/CalendarPicker';
+
+const LeadsCharts = dynamic(() => import('../components/charts/LeadsCharts'), { 
+  ssr: false,
+  loading: () => <div className="h-[300px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading charts...</div>
+});
 
 // Статические данные по тайтлам
 const titleData = [
@@ -36,7 +41,7 @@ export default function LeadsAnalytics() {
                     <select
                         value={selectedCampaign}
                         onChange={(e) => setSelectedCampaign(e.target.value)}
-                        className="px-3 py-2 border rounded-lg bg-white"
+                        className="px-3 py-2 border rounded-lg bg-slate-800 text-slate-100"
                     >
                         <option value="all">All campaigns</option>
                         <option value="camp1">Campaign A</option>
@@ -46,35 +51,7 @@ export default function LeadsAnalytics() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* График по тайтлам */}
-                <div className="bg-white rounded-xl shadow p-4">
-                    <h2 className="text-lg font-semibold mb-4">Leads by Title</h2>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={titleData} layout="vertical">
-                            <XAxis type="number" />
-                            <YAxis type="category" dataKey="title" width={120} />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#8884d8" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-
-                {/* График по локациям (круговая) */}
-                <div className="bg-white rounded-xl shadow p-4">
-                    <h2 className="text-lg font-semibold mb-4">Leads by Location</h2>
-                    <ResponsiveContainer width="100%" height={300}>
-                        <PieChart>
-                            <Pie data={locationData} dataKey="count" nameKey="location" cx="50%" cy="50%" outerRadius={100} label>
-                                {locationData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip />
-                        </PieChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
+            <LeadsCharts titleData={titleData} locationData={locationData} />
         </div>
     );
 }

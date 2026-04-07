@@ -1,7 +1,12 @@
 'use client';
 import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, LineChart, Line } from 'recharts';
+import dynamic from 'next/dynamic';
 import CalendarPicker from './components/CalendarPicker';
+
+const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), { 
+  ssr: false,
+  loading: () => <div className="h-[600px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading charts...</div>
+});
 
 // Пример данных для таблицы профилей
 const profilesData = [
@@ -37,9 +42,9 @@ export default function Dashboard() {
       </div>
 
       {/* Таблица профилей */}
-      <div className="bg-white rounded-xl shadow overflow-x-auto">
+      <div className="bg-slate-800 text-slate-100 rounded-xl shadow overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-100">
+          <thead className="bg-slate-700 text-slate-200">
             <tr>
               <th className="px-4 py-3 text-left">Profile</th>
               <th className="px-4 py-3 text-right">Invites</th>
@@ -78,36 +83,7 @@ export default function Dashboard() {
         </table>
       </div>
 
-      {/* График динамики (линейный) */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h2 className="text-lg font-semibold mb-4">Daily Activity</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={dailyData}>
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Line type="monotone" dataKey="invites" stroke="#8884d8" name="Invites" />
-            <Line type="monotone" dataKey="accepted" stroke="#82ca9d" name="Accepted" />
-            <Line type="monotone" dataKey="replies" stroke="#ffc658" name="Replies" />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Гистограмма: инвайты vs принятые по профилям */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <h2 className="text-lg font-semibold mb-4">Invites vs Accepted by Profile</h2>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={barData}>
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="invites" fill="#8884d8" name="Invites" />
-            <Bar dataKey="accepted" fill="#82ca9d" name="Accepted" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+      <DashboardCharts dailyData={dailyData} barData={barData} />
     </div>
   );
 }

@@ -1,6 +1,5 @@
 'use client';
 import { useState } from 'react';
-// @ts-ignore
 import { DateRangePicker } from 'react-date-range';
 import { subWeeks, subMonths } from 'date-fns';
 import 'react-date-range/dist/styles.css';
@@ -37,12 +36,46 @@ export default function CalendarPicker({ onDateChange }: { onDateChange: (start:
 
     return (
         <div className="flex items-center gap-4">
-            <div className="flex gap-2">
-                <button onClick={setLastWeek} className="px-3 py-2 bg-gray-200 rounded-lg text-sm">Last week</button>
-                <button onClick={setLastMonth} className="px-3 py-2 bg-gray-200 rounded-lg text-sm">Last month</button>
+            <style dangerouslySetInnerHTML={{ __html: `
+                .rdrStaticRangeLabel {
+                    color: #000000 !important;
+                    font-weight: 500 !important;
+                }
+                .rdrStaticRange {
+                    background: #ffffff !important;
+                    border-bottom: 1px solid #e2e8f0 !important;
+                }
+                .rdrStaticRange:hover .rdrStaticRangeLabel,
+                .rdrStaticRange.rdrStaticRangeSelected .rdrStaticRangeLabel {
+                    color: #000000 !important;
+                }
+                .rdrStaticRange:hover,
+                .rdrStaticRange.rdrStaticRangeSelected {
+                    background: #e2e8f0 !important;
+                }
+                .rdrInputRange {
+                    background: #ffffff !important;
+                }
+                .rdrInputRange span, .rdrInputRange span:hover {
+                    color: #000000 !important;
+                    font-weight: 500 !important;
+                }
+                .rdrInputRangeInput {
+                    color: #000000 !important;
+                    background: #e2e8f0 !important;
+                    border: 1px solid #cbd5e1 !important;
+                }
+            `}} />
+            <div className="overflow-hidden rounded-lg shadow-lg" style={{ filter: 'invert(0.92) hue-rotate(180deg)', backgroundColor: '#fff' }}>
+                {/* @ts-ignore */}
+                <DateRangePicker 
+                    ranges={range} 
+                    onChange={handleSelect} 
+                    moveRangeOnFirstSelection={false}
+                    months={1}
+                    direction="horizontal"
+                />
             </div>
-            {/* @ts-ignore */}
-            <DateRangePicker ranges={range} onChange={handleSelect} moveRangeOnFirstSelection={false} />
         </div>
     );
 }
