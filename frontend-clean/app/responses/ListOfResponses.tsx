@@ -1,7 +1,9 @@
 'use client';
 import { useState } from 'react';
 import { Link2 } from 'lucide-react';
+import ConversationModal from '../components/ConversationModal';
 
+// Статические данные (те же, но добавим сообщения для каждого лида)
 const mockResponses = [
     {
         id: 1,
@@ -12,8 +14,12 @@ const mockResponses = [
         location: 'Warsaw, Poland',
         title: 'CTO',
         type: 'interested',
-        message: 'Hi, I am very interested in your solution. Can we schedule a call?',
+        message: 'Hi, I am very interested...',
         date: '2026-04-05',
+        messages: [
+            { id: 1, direction: 'outbound', text: 'Hi Anna, we have a solution...', createdAt: '2026-04-05T09:00:00Z', profile: 'Volodymyr P.' },
+            { id: 2, direction: 'inbound', text: 'Very interested. Can we schedule a call?', createdAt: '2026-04-05T14:30:00Z', profile: null },
+        ],
     },
     {
         id: 2,
@@ -24,13 +30,18 @@ const mockResponses = [
         location: 'London, UK',
         title: 'Head of Sales',
         type: 'no need',
-        message: 'Not interested at this time, thanks.',
+        message: 'Not interested at this time.',
         date: '2026-04-04',
+        messages: [
+            { id: 1, direction: 'outbound', text: 'Hi John, check out our platform.', createdAt: '2026-04-04T10:00:00Z', profile: 'Volodymyr V.' },
+            { id: 2, direction: 'inbound', text: 'Not interested.', createdAt: '2026-04-04T11:00:00Z', profile: null },
+        ],
     },
 ];
 
 export default function ListOfResponses() {
     const [search, setSearch] = useState('');
+    const [selectedLead, setSelectedLead] = useState<any>(null);
 
     const filtered = mockResponses.filter(r =>
         r.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -51,7 +62,11 @@ export default function ListOfResponses() {
             </div>
             <div className="space-y-4">
                 {filtered.map(response => (
-                    <div key={response.id} className="bg-slate-800 text-slate-100 rounded-xl shadow p-4 flex gap-4">
+                    <div
+                        key={response.id}
+                        onClick={() => setSelectedLead(response)}
+                        className="bg-slate-800 text-slate-100 rounded-xl shadow p-4 flex gap-4 cursor-pointer hover:bg-slate-700 transition"
+                    >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={response.photo} alt={response.name} className="w-12 h-12 rounded-full object-cover" />
                         <div className="flex-1">
@@ -59,7 +74,7 @@ export default function ListOfResponses() {
                                 <div>
                                     <h3 className="font-semibold flex items-center gap-2">
                                         {response.name}
-                                        <a href={response.linkedin} target="_blank" rel="noopener noreferrer">
+                                        <a href={response.linkedin} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                                             <Link2 size={16} className="text-blue-600" />
                                         </a>
                                     </h3>
@@ -77,6 +92,11 @@ export default function ListOfResponses() {
                     </div>
                 ))}
             </div>
+
+            {/* Модальное окно */}
+            {selectedLead && (
+                <ConversationModal lead={selectedLead} onClose={() => setSelectedLead(null)} />
+            )}
         </div>
     );
 }
