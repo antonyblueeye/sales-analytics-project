@@ -1,8 +1,9 @@
 'use client';
-import { useState, useMemo, Fragment } from 'react';
+import { useState, useMemo, Fragment, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import DateRangePicker from './components/DateRangePicker';
-import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus } from 'lucide-react';
+import { format, subDays, differenceInDays } from 'date-fns';
 
 const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
   ssr: false,
@@ -75,6 +76,74 @@ const totalReplyRate = ((totals.replies / totals.messages) * 100).toFixed(1);
 
 type ProfileKeys = keyof Omit<typeof profilesData[0], 'campaigns'>;
 
+interface StatCellProps {
+  value: number | string;
+  previousValue: number | string;
+  isPercentage?: boolean;
+  startDate: Date;
+  endDate: Date;
+  customClass?: string;
+  rowIndex: number;
+}
+
+const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, customClass, rowIndex }: StatCellProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  const valNum = typeof value === 'string' ? parseFloat(value) : value;
+  const prevValNum = typeof previousValue === 'string' ? parseFloat(previousValue) : previousValue;
+
+  const diff = valNum - prevValNum;
+  const trend = diff > 0 ? 'up' : diff < 0 ? 'down' : 'equal';
+
+  const duration = differenceInDays(endDate, startDate) + 1;
+  const prevStartDate = subDays(startDate, duration);
+  const prevEndDate = subDays(endDate, duration);
+
+  const showBelow = rowIndex < 2;
+
+  return (
+    <td 
+      className={`px-4 py-3.5 text-right font-medium relative group ${customClass}`}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div className="flex items-center justify-end gap-1.5">
+        <span>{value}{isPercentage ? '%' : ''}</span>
+        {isHovered && (
+          <div className="animate-in fade-in zoom-in duration-200">
+            {trend === 'up' && <ArrowUp size={12} className="text-emerald-400" />}
+            {trend === 'down' && <ArrowDown size={12} className="text-rose-400" />}
+            {trend === 'equal' && <Minus size={12} className="text-slate-500" />}
+          </div>
+        )}
+      </div>
+
+      {isHovered && (
+        <div className={`absolute ${showBelow ? 'top-full mt-2' : 'bottom-full mb-2'} right-0 z-[100] animate-in fade-in ${showBelow ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2'} duration-300 pointer-events-none`}>
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-2xl min-w-[180px] backdrop-blur-xl">
+            <div className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">Previous Period</div>
+            <div className="text-[10px] text-slate-500 mb-2">
+              {format(prevStartDate, 'MMM dd')} - {format(prevEndDate, 'MMM dd, yyyy')}
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-semibold text-white">
+                {previousValue}{isPercentage ? '%' : ''}
+              </span>
+              <div className={`flex items-center gap-1 text-xs font-bold ${trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400'}`}>
+                {trend === 'up' ? '+' : trend === 'down' ? '' : ''}
+                {isPercentage ? diff.toFixed(1) : diff}
+                {isPercentage ? '%' : ''}
+              </div>
+            </div>
+          </div>
+          {/* Arrow */}
+          <div className={`w-2 h-2 bg-slate-800 border-slate-700 rotate-45 absolute ${showBelow ? '-top-1 border-l border-t' : '-bottom-1 border-r border-b'} right-4 transform translate-x-1/2`}></div>
+        </div>
+      )}
+    </td>
+  );
+};
+
 export default function Dashboard() {
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 3600000));
   const [endDate, setEndDate] = useState(new Date());
@@ -137,6 +206,16 @@ export default function Dashboard() {
     { label: 'Clients', key: 'clients', align: 'right' },
   ];
 
+  // Helper to generate mock previous stats (static but derived)
+  const getPrevStat = (val: number | string, seed: string) => {
+      const num = typeof val === 'string' ? parseFloat(val) : val;
+      // Stably generate a variation based on the name/value
+      const hash = seed.length;
+      const variation = (hash % 15) - 7; // -7 to +7
+      const result = num - variation;
+      return typeof val === 'string' ? result.toFixed(1) : Math.round(result);
+  };
+
   return (
     <div className="p-6 space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-center flex-wrap gap-4">
@@ -146,7 +225,7 @@ export default function Dashboard() {
 
       {/* Таблица профилей */}
       <div className="bg-[#0f172a]/95 text-slate-100 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-700/60 overflow-hidden backdrop-blur-xl">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-visible">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-800/80 text-slate-200 border-b border-slate-700/60">
               <tr>
@@ -166,7 +245,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {sortedProfiles.map(profile => {
+              {sortedProfiles.map((profile, idx) => {
                 const isExpanded = expandedProfiles.has(profile.name as string);
                 return (
                   <Fragment key={profile.name as string}>
@@ -180,40 +259,46 @@ export default function Dashboard() {
                         </div>
                       </td>
                       <td className="px-4 py-3.5 font-semibold text-slate-100 whitespace-nowrap">{profile.name}</td>
-                      <td className="px-4 py-3.5 text-right font-medium">{profile.invites}</td>
-                      <td className="px-4 py-3.5 text-right font-medium">{profile.accepted}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-emerald-400 bg-emerald-400/5 rounded-md my-1">{profile.acceptRate}%</td>
-                      <td className="px-4 py-3.5 text-right font-medium">{profile.messages}</td>
-                      <td className="px-4 py-3.5 text-right font-medium">{profile.replies}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-indigo-400 bg-indigo-400/5 rounded-md my-1">{profile.replyRate}%</td>
-                      <td className="px-4 py-3.5 text-right font-medium">{profile.interested}</td>
-                      <td className="px-4 py-3.5 text-right font-medium">{profile.calls}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-amber-200">{profile.mql}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-orange-300">{profile.sql}</td>
-                      <td className="px-4 py-3.5 text-right font-medium text-rose-300">{profile.partner}</td>
-                      <td className="px-4 py-3.5 text-right font-bold text-emerald-400">{profile.clients}</td>
+                      
+                      <StatCell value={profile.invites} previousValue={getPrevStat(profile.invites, profile.name + 'inv')} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.accepted} previousValue={getPrevStat(profile.accepted, profile.name + 'acc')} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.acceptRate} previousValue={getPrevStat(profile.acceptRate, profile.name + 'ar')} startDate={startDate} endDate={endDate} isPercentage customClass="text-emerald-400 bg-emerald-400/5 rounded-md my-1" rowIndex={idx} />
+                      
+                      <StatCell value={profile.messages} previousValue={getPrevStat(profile.messages, profile.name + 'msg')} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.replies} previousValue={getPrevStat(profile.replies, profile.name + 'rep')} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.replyRate} previousValue={getPrevStat(profile.replyRate, profile.name + 'rr')} startDate={startDate} endDate={endDate} isPercentage customClass="text-indigo-400 bg-indigo-400/5 rounded-md my-1" rowIndex={idx} />
+                      
+                      <StatCell value={profile.interested} previousValue={getPrevStat(profile.interested, profile.name + 'int')} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.calls} previousValue={getPrevStat(profile.calls, profile.name + 'cal')} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.mql} previousValue={getPrevStat(profile.mql, profile.name + 'mql')} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={idx} />
+                      <StatCell value={profile.sql} previousValue={getPrevStat(profile.sql, profile.name + 'sql')} startDate={startDate} endDate={endDate} customClass="text-orange-300" rowIndex={idx} />
+                      <StatCell value={profile.partner} previousValue={getPrevStat(profile.partner, profile.name + 'par')} startDate={startDate} endDate={endDate} customClass="text-rose-300" rowIndex={idx} />
+                      <StatCell value={profile.clients} previousValue={getPrevStat(profile.clients, profile.name + 'cli')} startDate={startDate} endDate={endDate} customClass="text-emerald-400 font-bold" rowIndex={idx} />
                     </tr>
 
                     {/* Развернутые строки (кампании) */}
-                    {isExpanded && profile.campaigns.map((camp, idx) => (
+                    {isExpanded && profile.campaigns.map((camp, cIdx) => (
                       <tr key={`${profile.name}-${camp.name}`} className="bg-slate-800/30 border-b border-slate-700/20 last:border-slate-700/40 hover:bg-slate-700/30 transition-colors text-[0.825rem]">
                         <td className="px-5 py-2.5"></td>
                         <td className="px-4 py-2.5 text-slate-300 pl-8 flex items-center gap-2">
                           <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
                           {camp.name}
                         </td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.invites}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.accepted}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.acceptRate}%</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.messages}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.replies}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.replyRate}%</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.interested}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.calls}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.mql}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.sql}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400">{camp.partner}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-400 font-medium">{camp.clients}</td>
+                        
+                        <StatCell value={camp.invites} previousValue={getPrevStat(camp.invites, camp.name + 'cinv')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.accepted} previousValue={getPrevStat(camp.accepted, camp.name + 'cacc')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.acceptRate} previousValue={getPrevStat(camp.acceptRate, camp.name + 'car')} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
+                        
+                        <StatCell value={camp.messages} previousValue={getPrevStat(camp.messages, camp.name + 'cmsg')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.replies} previousValue={getPrevStat(camp.replies, camp.name + 'crep')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.replyRate} previousValue={getPrevStat(camp.replyRate, camp.name + 'crr')} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
+                        
+                        <StatCell value={camp.interested} previousValue={getPrevStat(camp.interested, camp.name + 'cint')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.calls} previousValue={getPrevStat(camp.calls, camp.name + 'ccal')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.mql} previousValue={getPrevStat(camp.mql, camp.name + 'cmql')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.sql} previousValue={getPrevStat(camp.sql, camp.name + 'csql')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.partner} previousValue={getPrevStat(camp.partner, camp.name + 'cpar')} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                        <StatCell value={camp.clients} previousValue={getPrevStat(camp.clients, camp.name + 'ccli')} startDate={startDate} endDate={endDate} customClass="text-slate-400 font-medium" rowIndex={idx + 1} />
                       </tr>
                     ))}
                   </Fragment>
@@ -224,18 +309,21 @@ export default function Dashboard() {
               <tr>
                 <td className="px-5 py-4 w-10"></td>
                 <td className="px-4 py-4 text-left tracking-wide">TOTAL</td>
-                <td className="px-4 py-4 text-right text-indigo-200">{totals.invites}</td>
-                <td className="px-4 py-4 text-right text-indigo-200">{totals.accepted}</td>
-                <td className="px-4 py-4 text-right text-emerald-400">{totalAcceptRate}%</td>
-                <td className="px-4 py-4 text-right text-indigo-200">{totals.messages}</td>
-                <td className="px-4 py-4 text-right text-indigo-200">{totals.replies}</td>
-                <td className="px-4 py-4 text-right text-indigo-400">{totalReplyRate}%</td>
-                <td className="px-4 py-4 text-right text-indigo-200">{totals.interested}</td>
-                <td className="px-4 py-4 text-right text-indigo-200">{totals.calls}</td>
-                <td className="px-4 py-4 text-right text-amber-200">{totals.mql}</td>
-                <td className="px-4 py-4 text-right text-orange-300">{totals.sql}</td>
-                <td className="px-4 py-4 text-right text-rose-300">{totals.partner}</td>
-                <td className="px-4 py-4 text-right text-emerald-400 text-base">{totals.clients}</td>
+                
+                <StatCell value={totals.invites} previousValue={getPrevStat(totals.invites, 'total_inv')} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totals.accepted} previousValue={getPrevStat(totals.accepted, 'total_acc')} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totalAcceptRate} previousValue={getPrevStat(totalAcceptRate, 'total_ar')} startDate={startDate} endDate={endDate} isPercentage customClass="text-emerald-400" rowIndex={999} />
+                
+                <StatCell value={totals.messages} previousValue={getPrevStat(totals.messages, 'total_msg')} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totals.replies} previousValue={getPrevStat(totals.replies, 'total_rep')} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totalReplyRate} previousValue={getPrevStat(totalReplyRate, 'total_rr')} startDate={startDate} endDate={endDate} isPercentage customClass="text-indigo-400" rowIndex={999} />
+                
+                <StatCell value={totals.interested} previousValue={getPrevStat(totals.interested, 'total_int')} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totals.calls} previousValue={getPrevStat(totals.calls, 'total_cal')} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totals.mql} previousValue={getPrevStat(totals.mql, 'total_mql')} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={999} />
+                <StatCell value={totals.sql} previousValue={getPrevStat(totals.sql, 'total_sql')} startDate={startDate} endDate={endDate} customClass="text-orange-300" rowIndex={999} />
+                <StatCell value={totals.partner} previousValue={getPrevStat(totals.partner, 'total_par')} startDate={startDate} endDate={endDate} customClass="text-rose-300" rowIndex={999} />
+                <StatCell value={totals.clients} previousValue={getPrevStat(totals.clients, 'total_cli')} startDate={startDate} endDate={endDate} customClass="text-emerald-400 text-base" rowIndex={999} />
               </tr>
             </tfoot>
           </table>
