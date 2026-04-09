@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { DayPicker, DateRange } from 'react-day-picker';
 import { Calendar, ChevronDown, Check } from 'lucide-react';
-import { subDays, subWeeks, subMonths, startOfMonth, endOfMonth, startOfYear, isSameDay, format } from 'date-fns';
+import { subDays, subWeeks, subMonths, startOfMonth, endOfMonth, startOfYear, isSameDay, format, startOfWeek, endOfWeek } from 'date-fns';
 import 'react-day-picker/dist/style.css';
 
 interface DateRangePickerProps {
@@ -12,6 +12,17 @@ interface DateRangePickerProps {
 const PRESETS = [
     { label: 'Today', getValue: () => ({ from: new Date(), to: new Date() }) },
     { label: 'Yesterday', getValue: () => ({ from: subDays(new Date(), 1), to: subDays(new Date(), 1) }) },
+    { label: 'This week', getValue: () => ({ 
+        from: startOfWeek(new Date(), { weekStartsOn: 1 }), 
+        to: new Date() 
+    }) },
+    { label: 'Last week', getValue: () => {
+        const lastWeek = subWeeks(new Date(), 1);
+        return { 
+            from: startOfWeek(lastWeek, { weekStartsOn: 1 }), 
+            to: endOfWeek(lastWeek, { weekStartsOn: 1 }) 
+        };
+    }},
     { label: 'Last 7 days', getValue: () => ({ from: subDays(new Date(), 6), to: new Date() }) },
     { label: 'Last 30 days', getValue: () => ({ from: subDays(new Date(), 29), to: new Date() }) },
     { label: 'This month', getValue: () => ({ from: startOfMonth(new Date()), to: endOfMonth(new Date()) }) },

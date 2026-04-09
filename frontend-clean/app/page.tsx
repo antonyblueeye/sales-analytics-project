@@ -53,8 +53,14 @@ const dailyData = [
   { date: '2026-04-03', invites: 65, accepted: 20, replies: 12 },
 ];
 
-// Данные для гистограммы (инвайты vs принятые)
-const barData = profilesData.map(p => ({ name: p.name, invites: p.invites, accepted: p.accepted }));
+// Данные для графиков (профили)
+const barData = profilesData.map(p => ({ 
+  name: p.name, 
+  invites: p.invites, 
+  accepted: p.accepted,
+  messages: p.messages,
+  replies: p.replies
+}));
 
 // Вычисляем Итого
 const totals = profilesData.reduce((acc, curr) => {
