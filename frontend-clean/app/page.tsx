@@ -225,7 +225,7 @@ export default function Dashboard() {
   return (
     <div className="p-6 space-y-8 animate-in fade-in duration-500">
       <div className="flex justify-between items-center flex-wrap gap-4">
-        <h1 className="text-3xl font-bold tracking-tight text-white">Analytics Overview</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-white">Leads Analytics</h1>
         <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
       </div>
 

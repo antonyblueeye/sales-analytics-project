@@ -14,7 +14,7 @@ const navItems = [
     { name: 'Analytics Overview', href: '/', icon: LayoutDashboard },
     { name: 'Leads Analytics', href: '/leads', icon: Users },
     { name: 'Responses Analytics', href: '/responses', icon: Mail },
-    { name: 'Log Activity', href: '/log-activity', icon: Calendar },
+    { name: 'CRM', href: '/crm', icon: Calendar },
     { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

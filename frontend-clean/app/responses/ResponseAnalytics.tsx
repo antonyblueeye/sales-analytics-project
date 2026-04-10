@@ -67,8 +67,9 @@ export default function ResponseAnalytics() {
 
     return (
         <div className="space-y-8 text-slate-100">
-            <div className="flex flex-wrap justify-between gap-4 items-center">
-                <div className="flex gap-4">
+            <div className="flex justify-between items-center flex-wrap gap-4">
+                <h1 className="text-2xl font-bold tracking-tight text-white">Responses Analytics</h1>
+                <div className="flex items-center flex-wrap gap-4">
                     <CustomSelect
                         value={selectedCampaign}
                         onChange={setSelectedCampaign}
@@ -88,8 +89,8 @@ export default function ResponseAnalytics() {
                         ]}
                         icon={<MapPin size={16} />}
                     />
+                    <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
                 </div>
-                <DateRangePicker onDateChange={(start, end) => { setStartDate(start); setEndDate(end); }} />
             </div>
 
             {/* Top 5 Messages Table */}
