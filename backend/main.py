@@ -6,9 +6,9 @@ from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
 from models import Base, Campaign, Profile, Lead, Action
-from analytics import get_total_actions, get_total_leads
+from analytics import get_total_actions, get_total_leads, get_profiles_summary
 from typing import Optional
-from datetime import datetime, time, timedelta
+from datetime import datetime, time, timedelta, date
 
 app = FastAPI()
 
@@ -131,3 +131,13 @@ def total_leads(
     
     count = get_total_leads(db, from_dt, to_dt)
     return {"total_leads": count}
+
+
+@app.get("/analytics/profiles-summary")
+def profiles_summary(
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db)
+):
+    data = get_profiles_summary(db, from_date, to_date)
+    return data

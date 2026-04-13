@@ -18,6 +18,7 @@ import {
     Briefcase,
     Handshake,
     UserCheck,
+    Check,
     Calendar as CalendarIcon
 } from 'lucide-react';
 
@@ -203,6 +204,12 @@ export default function CRMPage() {
     const [showFilters, setShowFilters] = useState(false);
     const [selectedActivity, setSelectedActivity] = useState<string>('call');
     const [activityDate, setActivityDate] = useState(new Date().toISOString().split('T')[0]);
+    const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null);
+
+    const showToast = (message: string, type: 'success' | 'alert' = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 4000);
+    };
 
     const handleSaveActivity = () => {
         if (!activeLead) return;
@@ -217,7 +224,7 @@ export default function CRMPage() {
         };
         setActiveLead(updatedLead);
         setSelectedLead(updatedLead);
-        alert(`Activity saved: ${selectedActivity.toUpperCase()} on ${activityDate}`);
+        showToast(`${selectedActivity.toUpperCase()} on ${activityDate}`);
     };
 
     const handleDeleteActivity = (activityId: number) => {
@@ -719,6 +726,70 @@ export default function CRMPage() {
                     </div>
                 </>
             )}
+
+            {/* Premium Notification Toast */}
+            {toast && (
+                <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] animate-toast-in">
+                    <div className="relative overflow-hidden bg-slate-900/90 backdrop-blur-2xl border border-indigo-500/40 rounded-3xl p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7),0_0_20px_rgba(99,102,241,0.2)] flex items-center gap-5 min-w-[380px]">
+                        {/* Shimmer effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-400/10 to-transparent -translate-x-full animate-shimmer" />
+                        
+                        <div className="relative">
+                            <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/30 shadow-inner group">
+                                <Check size={28} strokeWidth={2.5} className="drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                            </div>
+                            <div className="absolute -top-1 -right-1 w-4 h-4 bg-indigo-500 rounded-full border-2 border-slate-900 flex items-center justify-center animate-bounce">
+                                <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                            </div>
+                        </div>
+                        
+                        <div className="flex-1">
+                            <div className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
+                                Success
+                                <div className="h-[1px] flex-1 bg-gradient-to-r from-indigo-500/50 to-transparent" />
+                            </div>
+                            <div className="text-lg font-bold text-slate-100 mt-0.5">Activity Recorded</div>
+                            <div className="text-xs text-slate-400 font-medium">{toast.message}</div>
+                        </div>
+
+                        <button 
+                            onClick={() => setToast(null)}
+                            className="p-2.5 hover:bg-slate-800/80 rounded-xl text-slate-500 hover:text-white transition-all active:scale-90 hover:rotate-90 duration-300"
+                        >
+                            <X size={20} />
+                        </button>
+
+                        {/* Animated Progress Bar */}
+                        <div className="absolute bottom-0 left-0 right-0 h-[4px] bg-slate-800">
+                            <div className="h-full bg-indigo-500 shadow-[0_0_15px_#6366f1] animate-toast-progress-bar" />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style jsx global>{`
+                @keyframes toast-in {
+                    0% { transform: translate(-50%, 20px) scale(0.9); opacity: 0; }
+                    100% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+                }
+                .animate-toast-in {
+                    animation: toast-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+                }
+                @keyframes toast-progress-bar {
+                    from { width: 100%; }
+                    to { width: 0%; }
+                }
+                .animate-toast-progress-bar {
+                    animation: toast-progress-bar 4s linear forwards;
+                }
+                @keyframes shimmer {
+                    0% { transform: translateX(-100%); }
+                    100% { transform: translateX(100%); }
+                }
+                .animate-shimmer {
+                    animation: shimmer 3s infinite;
+                }
+            `}</style>
         </div>
     );
 }
