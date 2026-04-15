@@ -21,9 +21,10 @@ import {
     Check,
     Calendar as CalendarIcon
 } from 'lucide-react';
+import axios from 'axios';
 
 interface Lead {
-    id: number;
+    id: string;
     firstName: string;
     lastName: string;
     company: string;
@@ -118,75 +119,6 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
     );
 };
 
-const mockLeads: Lead[] = [
-    { 
-        id: 1, 
-        firstName: 'Anna', 
-        lastName: 'Kowalski', 
-        company: 'TechCorp', 
-        title: 'CTO', 
-        photo: 'https://randomuser.me/api/portraits/women/68.jpg',
-        status: 'Connected',
-        location: 'Warsaw, Poland',
-        campaign: 'Spring Outreach',
-        email: 'anna@techcorp.com',
-        linkedinUrl: 'https://linkedin.com/in/annakowalski',
-        hubspotUrl: 'https://app.hubspot.com/contacts/123/contact/456',
-        messages: [
-            { role: 'me', text: 'Hi Anna, I saw your post about TechCorp expansion. Would love to connect!', timestamp: '2026-04-05 10:00' },
-            { role: 'lead', text: 'Hey! Thanks for reaching out. Yes, we are growing fast.', timestamp: '2026-04-05 14:20' },
-            { role: 'me', text: 'That sounds exciting. Are you looking for any data analytics solutions?', timestamp: '2026-04-06 09:15' },
-        ],
-        activities: [
-            { id: 1, type: 'call', date: '2026-04-05' },
-            { id: 2, type: 'mql', date: '2026-04-07' },
-        ],
-        createdAt: '2026-03-15',
-        lastActivityAt: '2026-04-07'
-    },
-    { 
-        id: 2, 
-        firstName: 'John', 
-        lastName: 'Smith', 
-        company: 'Innovate Ltd', 
-        title: 'Head of Sales', 
-        photo: 'https://randomuser.me/api/portraits/men/32.jpg',
-        status: 'Interested',
-        location: 'London, UK',
-        campaign: 'Sales Leaders 2026',
-        email: 'john.smith@innovate.co',
-        linkedinUrl: 'https://linkedin.com/in/johnsmith',
-        hubspotUrl: 'https://app.hubspot.com/contacts/123/contact/789',
-        messages: [
-            { role: 'me', text: 'Hi John, I noticed your focus on sales automation.', timestamp: '2026-04-08 11:00' },
-            { role: 'lead', text: 'Hi, yes. We are currently evaluating some tools.', timestamp: '2026-04-09T16:00:00Z' }
-        ],
-        activities: [
-            { id: 3, type: 'sql', date: '2026-04-09' },
-        ],
-        createdAt: '2026-04-01',
-        lastActivityAt: '2026-04-09'
-    },
-    { 
-        id: 3, 
-        firstName: 'Maria', 
-        lastName: 'Garcia', 
-        company: 'StartupX', 
-        title: 'CEO', 
-        photo: 'https://randomuser.me/api/portraits/women/45.jpg',
-        status: 'Replied',
-        location: 'Madrid, Spain',
-        campaign: 'CEO Network',
-        email: 'm.garcia@startupx.es',
-        linkedinUrl: 'https://linkedin.com/in/mariagarcia',
-        hubspotUrl: 'https://app.hubspot.com/contacts/123/contact/012',
-        messages: [],
-        activities: [],
-        createdAt: '2026-04-08',
-        lastActivityAt: '2026-04-08'
-    },
-];
-
 const statusColors: Record<string, string> = {
     'Connected': 'bg-green-500/10 text-green-500 border-green-500/20',
     'Interested': 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
@@ -195,6 +127,12 @@ const statusColors: Record<string, string> = {
 };
 
 export default function CRMPage() {
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [totalLeads, setTotalLeads] = useState(0);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // ... rest of the original states ...
     const [search, setSearch] = useState('');
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [activeLead, setActiveLead] = useState<Lead | null>(null);
@@ -204,7 +142,115 @@ export default function CRMPage() {
     const [showFilters, setShowFilters] = useState(false);
     const [selectedActivity, setSelectedActivity] = useState<string>('call');
     const [activityDate, setActivityDate] = useState(new Date().toISOString().split('T')[0]);
+    const [activeTab, setActiveTab] = useState<'all' | 'replied'>('all');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null);
+
+    // Filter states
+    const [filterCampaign, setFilterCampaign] = useState('');
+    const [filterStatus, setFilterStatus] = useState('');
+    const [filterPosition, setFilterPosition] = useState('');
+    const [filterCompany, setFilterCompany] = useState('');
+    const [filterLocation, setFilterLocation] = useState('');
+    const [filterFirstName, setFilterFirstName] = useState('');
+    const [filterLastName, setFilterLastName] = useState('');
+    const [filterCreateDate, setFilterCreateDate] = useState('');
+    const [filterActivityDate, setFilterActivityDate] = useState('');
+
+    const fetchLeads = async (page: number, currentFilters: any = {}) => {
+        setIsLoading(true);
+        try {
+            const endpoint = activeTab === 'all' 
+                ? 'http://localhost:8000/crm/leads' 
+                : 'http://localhost:8000/crm/replied-leads';
+
+            // Build query params
+            const params = new URLSearchParams({
+                page: page.toString(),
+                limit: '20'
+            });
+            
+            if (activeTab === 'all') {
+                if (currentFilters.search) params.append('search', currentFilters.search);
+                if (currentFilters.firstName) params.append('first_name', currentFilters.firstName);
+                if (currentFilters.lastName) params.append('last_name', currentFilters.lastName);
+                if (currentFilters.company) params.append('company', currentFilters.company);
+                if (currentFilters.location) params.append('location', currentFilters.location);
+                if (currentFilters.position) params.append('title', currentFilters.position);
+            }
+
+            const res = await axios.get(`${endpoint}?${params.toString()}`);
+            const mappedLeads = res.data.leads.map((l: any, idx: number) => ({
+                id: l.id || `${page}-${idx}-${l.email}`,
+                firstName: l.first_name,
+                lastName: l.last_name,
+                company: l.company_name,
+                title: l.title,
+                photo: l.photo_url || `https://ui-avatars.com/api/?name=${l.first_name}+${l.last_name}&background=6366f1&color=fff`,
+                status: activeTab === 'replied' ? 'Replied' : l.status,
+                location: l.location,
+                campaign: 'N/A',
+                email: l.email,
+                linkedinUrl: l.linkedin_url,
+                hubspotUrl: '', 
+                messages: l.messages || [],
+                activities: [],
+                createdAt: l.last_reply_at || '2026-04-15',
+                lastActivityAt: l.last_reply_at || '2026-04-15'
+            }));
+            setLeads(mappedLeads);
+            setTotalLeads(res.data.total);
+        } catch (error) {
+            console.error('Error fetching leads:', error);
+            setLeads([]);
+            setTotalLeads(0);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Effect for handling tab changes
+    useEffect(() => {
+        setCurrentPage(1);
+        fetchLeads(1, {
+            search,
+            firstName: filterFirstName,
+            lastName: filterLastName,
+            company: filterCompany,
+            location: filterLocation,
+            position: filterPosition
+        });
+    }, [activeTab]);
+
+    // Debounce effect for filters
+    useEffect(() => {
+        if (activeTab !== 'all') return; // Only 'all' tab uses live filters for now
+        
+        const handler = setTimeout(() => {
+            setCurrentPage(1); // Reset to first page on filter change
+            fetchLeads(1, {
+                search,
+                firstName: filterFirstName,
+                lastName: filterLastName,
+                company: filterCompany,
+                location: filterLocation,
+                position: filterPosition
+            });
+        }, 500); // 500ms debounce
+
+        return () => clearTimeout(handler);
+    }, [search, filterFirstName, filterLastName, filterCompany, filterLocation, filterPosition]);
+
+    // Handle pagination specifically
+    useEffect(() => {
+        fetchLeads(currentPage, {
+            search,
+            firstName: filterFirstName,
+            lastName: filterLastName,
+            company: filterCompany,
+            location: filterLocation,
+            position: filterPosition
+        });
+    }, [currentPage]);
 
     const showToast = (message: string, type: 'success' | 'alert' = 'success') => {
         setToast({ message, type });
@@ -264,16 +310,6 @@ export default function CRMPage() {
         }, 300);
     };
 
-    // Filter states
-    const [filterCampaign, setFilterCampaign] = useState('');
-    const [filterStatus, setFilterStatus] = useState('');
-    const [filterPosition, setFilterPosition] = useState('');
-    const [filterCompany, setFilterCompany] = useState('');
-    const [filterLocation, setFilterLocation] = useState('');
-    const [filterFirstName, setFilterFirstName] = useState('');
-    const [filterLastName, setFilterLastName] = useState('');
-    const [filterCreateDate, setFilterCreateDate] = useState('');
-    const [filterActivityDate, setFilterActivityDate] = useState('');
 
     const startResizing = (e: ReactMouseEvent) => {
         setIsResizing(true);
@@ -302,21 +338,8 @@ export default function CRMPage() {
         };
     }, [isResizing]);
 
-    const filteredLeads = mockLeads.filter(lead => {
-        const matchesSearch = (lead.firstName + ' ' + lead.lastName).toLowerCase().includes(search.toLowerCase()) ||
-                             lead.company.toLowerCase().includes(search.toLowerCase());
-        const matchesCampaign = !filterCampaign || lead.campaign.toLowerCase().includes(filterCampaign.toLowerCase());
-        const matchesStatus = !filterStatus || lead.status.toLowerCase().includes(filterStatus.toLowerCase());
-        const matchesPosition = !filterPosition || lead.title.toLowerCase().includes(filterPosition.toLowerCase());
-        const matchesCompany = !filterCompany || lead.company.toLowerCase().includes(filterCompany.toLowerCase());
-        const matchesFirstName = !filterFirstName || lead.firstName.toLowerCase().includes(filterFirstName.toLowerCase());
-        const matchesLastName = !filterLastName || lead.lastName.toLowerCase().includes(filterLastName.toLowerCase());
-        const matchesLocation = !filterLocation || lead.location.toLowerCase().includes(filterLocation.toLowerCase());
-        const matchesCreateDate = !filterCreateDate || lead.createdAt === filterCreateDate;
-        const matchesActivityDate = !filterActivityDate || lead.lastActivityAt === filterActivityDate;
-        
-        return matchesSearch && matchesCampaign && matchesStatus && matchesPosition && matchesCompany && matchesFirstName && matchesLastName && matchesLocation && matchesCreateDate && matchesActivityDate;
-    });
+    // filteredLeads now just returns leads from state
+    const filteredLeads = leads;
 
     const activeFiltersCount = [
         filterCampaign, filterStatus, filterPosition, filterCompany, 
@@ -341,7 +364,23 @@ export default function CRMPage() {
             {/* Header Content */}
             <div className="flex flex-col gap-4 mb-6 pt-2 px-1">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight text-white">CRM</h1>
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl font-bold tracking-tight text-white">CRM</h1>
+                        <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-xl w-fit border border-slate-700/50 mt-1">
+                            <button 
+                                onClick={() => setActiveTab('all')}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                            >
+                                All Leads
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('replied')}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'replied' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                            >
+                                Replied
+                            </button>
+                        </div>
+                    </div>
                     <div className="flex items-center gap-2">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -470,14 +509,19 @@ export default function CRMPage() {
             </div>
 
             {/* List Content */}
-            <div className="flex-1 overflow-auto bg-slate-800/30 border border-slate-800 rounded-xl">
+            <div className="flex-1 overflow-auto bg-slate-800/30 border border-slate-800 rounded-xl relative">
+                {isLoading && (
+                    <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-20 flex items-center justify-center">
+                        <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                )}
                 <table className="w-full border-collapse text-left">
                     <thead className="sticky top-0 bg-slate-900/80 backdrop-blur-md z-10 border-b border-slate-700/50">
                         <tr>
                             <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Lead</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Title</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider"></th>
+                            <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Company / Title</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Location</th>
+                            <th className="px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider text-right">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
@@ -492,32 +536,98 @@ export default function CRMPage() {
                                         <img src={lead.photo} className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 group-hover:border-indigo-500/50 transition-colors" alt="" />
                                         <div>
                                             <div className="text-sm font-semibold text-slate-100">{lead.firstName} {lead.lastName}</div>
-                                            <div className="text-xs text-slate-400">{lead.company}</div>
+                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold mt-1 ${statusColors[lead.status]}`}>
+                                                {lead.status}
+                                            </span>
                                         </div>
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="text-sm text-slate-300">{lead.title}</div>
+                                    <div className="text-sm text-slate-100 font-medium">{lead.title || lead.company || 'N/A'}</div>
+                                    {lead.title && lead.company && <div className="text-xs text-slate-500">{lead.company}</div>}
                                 </td>
                                 <td className="px-6 py-4">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusColors[lead.status] || statusColors['New']}`}>
-                                        {lead.status}
-                                    </span>
+                                    <div className="text-sm text-slate-300">{lead.location || 'Unknown'}</div>
                                 </td>
                                 <td className="px-6 py-4 text-right">
-                                    <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                        }}
-                                        className="p-1.5 rounded-md text-slate-500 hover:text-slate-300 hover:bg-slate-700 transition-colors"
-                                    >
-                                        <MoreHorizontal size={18} />
-                                    </button>
+                                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {lead.linkedinUrl && (
+                                            <a href={lead.linkedinUrl} target="_blank" onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-slate-700/50 rounded-md transition-colors">
+                                                <img src="/linkedin_icon.png" className="w-4 h-4 object-contain" alt="LinkedIn" />
+                                            </a>
+                                        )}
+                                        {lead.email && (
+                                            <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-slate-700 rounded-md text-emerald-400">
+                                                <Mail size={16} />
+                                            </a>
+                                        )}
+                                        <button className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400">
+                                            <MoreHorizontal size={16} />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
+                
+                {/* Simple Pagination */}
+                <div className="sticky bottom-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-700/50 p-4 flex items-center justify-between z-10">
+                    <div className="text-xs text-slate-400">
+                        Showing <span className="text-white font-bold">{(currentPage - 1) * 20 + 1}</span> to <span className="text-white font-bold">{Math.min(currentPage * 20, totalLeads)}</span> of <span className="text-white font-bold">{totalLeads}</span> leads
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button 
+                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                        >
+                            Previous
+                        </button>
+                        
+                        <div className="flex items-center gap-1 mx-2">
+                            {(() => {
+                                const totalPages = Math.ceil(totalLeads / 20);
+                                const pages = [];
+                                const delta = 1; 
+
+                                for (let i = 1; i <= totalPages; i++) {
+                                    if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
+                                        pages.push(i);
+                                    } else if (i === currentPage - delta - 1 || i === currentPage + delta + 1) {
+                                        pages.push('...');
+                                    }
+                                }
+                                
+                                return pages.filter((v, i, a) => v !== '...' || a[i-1] !== '...').map((p, idx) => (
+                                    p === '...' ? (
+                                        <span key={`dots-${idx}`} className="text-slate-600 px-1">...</span>
+                                    ) : (
+                                        <button
+                                            key={p}
+                                            onClick={() => setCurrentPage(Number(p))}
+                                            className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition-all active:scale-90 ${
+                                                currentPage === p 
+                                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                                                : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent hover:border-slate-700'
+                                            }`}
+                                        >
+                                            {p}
+                                        </button>
+                                    )
+                                ));
+                            })()}
+                        </div>
+
+                        <button 
+                            disabled={currentPage * 20 >= totalLeads}
+                            onClick={() => setCurrentPage(p => p + 1)}
+                            className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
+                        >
+                            Next
+                        </button>
+                    </div>
+                </div>
             </div>
 
             {/* Resizable Drawer with Transition */}
@@ -579,43 +689,49 @@ export default function CRMPage() {
                                 <section>
                                     <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Contact Information</h3>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <a 
-                                            href={activeLead?.linkedinUrl} 
-                                            target="_blank" 
-                                            className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-indigo-500/50 hover:bg-slate-800 transition-all group"
-                                        >
-                                            <div className="p-2 bg-blue-600/20 text-blue-500 rounded-lg group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                                <Globe size={18} />
+                                        {activeLead?.linkedinUrl && (
+                                            <a 
+                                                href={activeLead?.linkedinUrl} 
+                                                target="_blank" 
+                                                className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-[#0077b5]/50 hover:bg-slate-800 transition-all group"
+                                            >
+                                                <div className="p-2 bg-[#0077b5]/10 rounded-lg group-hover:bg-[#0077b5] transition-colors">
+                                                    <img src="/linkedin_icon.png" className="w-[18px] h-[18px] object-contain" alt="LinkedIn" />
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <div className="text-xs text-slate-400">LinkedIn</div>
+                                                    <div className="text-sm font-medium truncate">View Profile</div>
+                                                </div>
+                                                <ExternalLink size={14} className="text-slate-500" />
+                                            </a>
+                                        )}
+                                        {activeLead?.hubspotUrl && (
+                                            <a 
+                                                href={activeLead?.hubspotUrl} 
+                                                target="_blank" 
+                                                className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-orange-500/50 hover:bg-slate-800 transition-all group"
+                                            >
+                                                <div className="p-2 bg-orange-600/20 text-orange-500 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
+                                                    <div className="w-[18px] h-[18px] flex items-center justify-center font-bold text-[10px]">HS</div>
+                                                </div>
+                                                <div className="flex-1 overflow-hidden">
+                                                    <div className="text-xs text-slate-400">HubSpot</div>
+                                                    <div className="text-sm font-medium truncate">Open CRM</div>
+                                                </div>
+                                                <ExternalLink size={14} className="text-slate-500" />
+                                            </a>
+                                        )}
+                                        {activeLead?.email && (
+                                            <div className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-indigo-500/50 hover:bg-slate-800 transition-all group cursor-pointer col-span-2">
+                                                <div className="p-2 bg-indigo-600/20 text-indigo-500 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                                    <Mail size={18} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="text-xs text-slate-400">Email Address</div>
+                                                    <div className="text-sm font-medium">{activeLead?.email}</div>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <div className="text-xs text-slate-400">LinkedIn</div>
-                                                <div className="text-sm font-medium truncate">View Profile</div>
-                                            </div>
-                                            <ExternalLink size={14} className="text-slate-500" />
-                                        </a>
-                                        <a 
-                                            href={activeLead?.hubspotUrl} 
-                                            target="_blank" 
-                                            className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-orange-500/50 hover:bg-slate-800 transition-all group"
-                                        >
-                                            <div className="p-2 bg-orange-600/20 text-orange-500 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
-                                                <div className="w-[18px] h-[18px] flex items-center justify-center font-bold text-[10px]">HS</div>
-                                            </div>
-                                            <div className="flex-1 overflow-hidden">
-                                                <div className="text-xs text-slate-400">HubSpot</div>
-                                                <div className="text-sm font-medium truncate">Open CRM</div>
-                                            </div>
-                                            <ExternalLink size={14} className="text-slate-500" />
-                                        </a>
-                                        <div className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-indigo-500/50 hover:bg-slate-800 transition-all group cursor-pointer col-span-2">
-                                            <div className="p-2 bg-indigo-600/20 text-indigo-500 rounded-lg group-hover:bg-indigo-600 group-hover:text-white transition-colors">
-                                                <Mail size={18} />
-                                            </div>
-                                            <div className="flex-1">
-                                                <div className="text-xs text-slate-400">Email Address</div>
-                                                <div className="text-sm font-medium">{activeLead?.email}</div>
-                                            </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </section>
 
@@ -698,20 +814,38 @@ export default function CRMPage() {
                                     <div className="flex-1 bg-slate-800/50 border border-slate-700 rounded-2xl flex flex-col p-4 overflow-hidden">
                                         <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
                                             {activeLead?.messages && activeLead.messages.length > 0 ? (
-                                                activeLead.messages.map((msg, i) => (
-                                                    <div key={i} className={`flex ${msg.role === 'lead' ? 'justify-end' : 'justify-start'}`}>
-                                                        <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                                                            msg.role === 'lead' 
-                                                            ? 'bg-indigo-600 text-white rounded-tr-none' 
-                                                            : 'bg-slate-700/80 text-slate-100 rounded-tl-none'
-                                                        }`}>
-                                                            {msg.text}
-                                                            <div className={`text-[10px] mt-1 ${msg.role === 'lead' ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                                                {msg.timestamp}
+                                                activeLead.messages.map((msg, i) => {
+                                                    const messageDate = msg.timestamp.split(' ')[1];
+                                                    const prevMessageDate = i > 0 ? activeLead.messages[i-1].timestamp.split(' ')[1] : null;
+                                                    const showDateHeader = messageDate !== prevMessageDate;
+                                                    const messageTime = msg.timestamp.split(' ')[0];
+
+                                                    return (
+                                                        <div key={i} className="space-y-4">
+                                                            {showDateHeader && (
+                                                                <div className="flex items-center justify-center my-6">
+                                                                    <div className="h-[1px] bg-slate-800 flex-1" />
+                                                                    <span className="px-3 text-[10px] font-bold text-slate-500 bg-slate-900/50 py-1 rounded-full border border-slate-800 mx-4">
+                                                                        {messageDate}
+                                                                    </span>
+                                                                    <div className="h-[1px] bg-slate-800 flex-1" />
+                                                                </div>
+                                                            )}
+                                                            <div className={`flex ${msg.role === 'lead' ? 'justify-end' : 'justify-start'}`}>
+                                                                <div className={`max-w-[80%] p-3 rounded-2xl text-sm relative group/msg ${
+                                                                    msg.role === 'lead' 
+                                                                    ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-600/20' 
+                                                                    : 'bg-slate-700/80 text-slate-100 rounded-tl-none border border-slate-600/50'
+                                                                }`}>
+                                                                    {msg.text}
+                                                                    <div className={`text-[9px] mt-1.5 text-right opacity-70 ${msg.role === 'lead' ? 'text-indigo-100' : 'text-slate-400'}`}>
+                                                                        {messageTime}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                ))
+                                                    );
+                                                })
                                             ) : (
                                                 <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2 opacity-50">
                                                     <MessageCircle size={32} />
