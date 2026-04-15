@@ -6,7 +6,7 @@ from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
 from models import Base, Campaign, Profile, Lead, Action
-from analytics import get_total_actions, get_total_leads, get_profiles_summary
+from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary
 from typing import Optional
 from datetime import datetime, time, timedelta, date
 
@@ -140,4 +140,13 @@ def profiles_summary(
     db: Session = Depends(get_db)
 ):
     data = get_profiles_summary(db, from_date, to_date)
+    return data
+
+@app.get("/analytics/campaigns-summary")
+def campaigns_summary(
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db)
+):
+    data = get_campaigns_summary(db, from_date, to_date)
     return data

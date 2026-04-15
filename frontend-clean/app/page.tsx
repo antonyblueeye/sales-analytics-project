@@ -12,51 +12,6 @@ const DashboardCharts = dynamic(() => import('./components/charts/DashboardChart
 });
 
 // Пример данных для таблицы профилей (теперь с кампаниями)
-const profilesData = [
-  {
-    name: 'Volodymyr P.', invites: 1200, accepted: 350, acceptRate: 29.2, messages: 980, replies: 210, replyRate: 21.4, interested: 45, calls: 12, mql: 28, sql: 15, partner: 6, clients: 4,
-    campaigns: [
-      { name: 'CEO Outreach', invites: 800, accepted: 250, acceptRate: 31.2, messages: 680, replies: 150, replyRate: 22.0, interested: 35, calls: 10, mql: 20, sql: 10, partner: 4, clients: 3 },
-      { name: 'Sales Leaders', invites: 400, accepted: 100, acceptRate: 25.0, messages: 300, replies: 60, replyRate: 20.0, interested: 10, calls: 2, mql: 8, sql: 5, partner: 2, clients: 1 }
-    ]
-  },
-  {
-    name: 'Volodymyr V.', invites: 980, accepted: 280, acceptRate: 28.6, messages: 810, replies: 175, replyRate: 21.6, interested: 38, calls: 9, mql: 22, sql: 11, partner: 4, clients: 3,
-    campaigns: [
-      { name: 'Marketing US', invites: 500, accepted: 150, acceptRate: 30.0, messages: 410, replies: 105, replyRate: 25.6, interested: 28, calls: 6, mql: 15, sql: 8, partner: 3, clients: 2 },
-      { name: 'Founders EU', invites: 480, accepted: 130, acceptRate: 27.1, messages: 400, replies: 70, replyRate: 17.5, interested: 10, calls: 3, mql: 7, sql: 3, partner: 1, clients: 1 }
-    ]
-  },
-  {
-    name: 'Nazar V.', invites: 1450, accepted: 410, acceptRate: 28.3, messages: 1200, replies: 250, replyRate: 20.8, interested: 52, calls: 15, mql: 31, sql: 18, partner: 7, clients: 5,
-    campaigns: [
-      { name: 'CTO Network', invites: 1000, accepted: 290, acceptRate: 29.0, messages: 800, replies: 180, replyRate: 22.5, interested: 40, calls: 12, mql: 25, sql: 14, partner: 5, clients: 4 },
-      { name: 'DevOps Leads', invites: 450, accepted: 120, acceptRate: 26.6, messages: 400, replies: 70, replyRate: 17.5, interested: 12, calls: 3, mql: 6, sql: 4, partner: 2, clients: 1 }
-    ]
-  },
-  {
-    name: 'Svitlana V.', invites: 860, accepted: 230, acceptRate: 26.7, messages: 710, replies: 140, replyRate: 19.7, interested: 30, calls: 7, mql: 18, sql: 10, partner: 3, clients: 2,
-    campaigns: [
-      { name: 'HR Mng UK', invites: 600, accepted: 160, acceptRate: 26.6, messages: 500, replies: 100, replyRate: 20.0, interested: 20, calls: 5, mql: 12, sql: 7, partner: 2, clients: 1 },
-      { name: 'Product Mng', invites: 260, accepted: 70, acceptRate: 26.9, messages: 210, replies: 40, replyRate: 19.0, interested: 10, calls: 2, mql: 6, sql: 3, partner: 1, clients: 1 }
-    ]
-  },
-];
-
-// Пример данных для графика динамики (по дням)
-// Логика-заглушка для метрик, которых пока нет в базе данных (interested, calls и т.д.)
-const getPlaceholderStats = (profileName: string) => ({
-  interested: 'N/A', calls: 'N/A', mql: 'N/A', sql: 'N/A', partner: 'N/A', clients: 'N/A',
-  // Добавляем тестовую кампанию для демонстрации раскрытия списка
-  campaigns: [
-    { 
-      name: `Default Campaign (${profileName})`, 
-      invites: 'N/A', accepted: 'N/A', acceptRate: 'N/A', 
-      messages: 'N/A', replies: 'N/A', replyRate: 'N/A', 
-      interested: 'N/A', calls: 'N/A', mql: 'N/A', sql: 'N/A', partner: 'N/A', clients: 'N/A' 
-    }
-  ]
-});
 
 // Описание структуры данных профиля для TypeScript
 type ProfileData = {
@@ -164,17 +119,50 @@ export default function Dashboard() {
       const prevStart = subDays(startDate, duration);
       const prevEnd = subDays(startDate, 1);
 
-      // Запускаем оба запроса параллельно
-      const [currRes, prevRes] = await Promise.all([
+      // Запускаем все запросы параллельно: профили и кампании (текущие и прошлые)
+      const [currRes, prevRes, currCampRes, prevCampRes] = await Promise.all([
         axios.get('http://localhost:8000/analytics/profiles-summary', {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         }),
         axios.get('http://localhost:8000/analytics/profiles-summary', {
           params: { from_date: format(prevStart, 'yyyy-MM-dd'), to_date: format(prevEnd, 'yyyy-MM-dd') }
+        }),
+        axios.get('http://localhost:8000/analytics/campaigns-summary', {
+          params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
+        }),
+        axios.get('http://localhost:8000/analytics/campaigns-summary', {
+          params: { from_date: format(prevStart, 'yyyy-MM-dd'), to_date: format(prevEnd, 'yyyy-MM-dd') }
         })
       ]);
 
-      const mapItem = (item: any) => ({
+      // Группируем кампании по профилям
+      const groupCampaignsByProfile = (campData: any[]) => {
+        const map: Record<string, any[]> = {};
+        campData.forEach(c => {
+          if (!map[c.profile_name]) map[c.profile_name] = [];
+          map[c.profile_name].push({
+            name: c.campaign_name || 'Unnamed Campaign',
+            invites: c.invited || 0,
+            accepted: c.accepted || 0,
+            acceptRate: c.acceptance_rate || 0,
+            messages: c.messaged || 0,
+            replies: c.replied || 0,
+            replyRate: c.reply_rate || 0,
+            interested: 'N/A',
+            calls: 'N/A',
+            mql: 'N/A',
+            sql: 'N/A',
+            partner: 'N/A',
+            clients: 'N/A'
+          });
+        });
+        return map;
+      };
+
+      const currCamps = groupCampaignsByProfile(currCampRes.data);
+      const prevCamps = groupCampaignsByProfile(prevCampRes.data);
+
+      const mapItem = (item: any, campaignsMap: Record<string, any[]>) => ({
         name: item.profile_name || 'Unknown',
         invites: item.invited || 0,
         accepted: item.accepted || 0,
@@ -182,11 +170,17 @@ export default function Dashboard() {
         messages: item.messaged || 0,
         replies: item.replied || 0,
         replyRate: item.reply_rate || 0,
-        ...getPlaceholderStats(item.profile_name || 'Unknown')
+        interested: 'N/A',
+        calls: 'N/A',
+        mql: 'N/A',
+        sql: 'N/A',
+        partner: 'N/A',
+        clients: 'N/A',
+        campaigns: campaignsMap[item.profile_name] || []
       });
 
-      setProfiles(currRes.data.map(mapItem));
-      setPrevProfiles(prevRes.data.map(mapItem));
+      setProfiles(currRes.data.map((item: any) => mapItem(item, currCamps)));
+      setPrevProfiles(prevRes.data.map((item: any) => mapItem(item, prevCamps)));
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -200,7 +194,7 @@ export default function Dashboard() {
   }, [fetchProfiles]);
 
   // useMemo пересчитывает итоги и данные для графиков ТОЛЬКО когда меняются данные профилей или даты
-  const { totals, prevTotals, totalAcceptRate, totalReplyRate, barData, dailyData } = useMemo(() => {
+  const { totals, prevTotals, totalAcceptRate, totalReplyRate, barData, dailyData, campaignData } = useMemo(() => {
     const calculateTotals = (data: ProfileData[]) => data.reduce((acc, curr) => {
       acc.invites += curr.invites;
       acc.accepted += curr.accepted;
@@ -223,9 +217,7 @@ export default function Dashboard() {
       replies: p.replies
     }));
 
-    // Генерируем "фейковую" динамику по дням для визуализации в графике (Area Chart),
-    // так как отдельного эндпоинта под временной ряд у нас пока нет.
-    // Мы берем общее число за период и равномерно распределяем его с небольшим рандомом.
+    // Генерируем "фейковую" динамику по дням для визуализации в графике (Area Chart)
     const days = differenceInDays(endDate, startDate) + 1;
     const dd = Array.from({ length: Math.min(days, 14) }).map((_, i) => {
       const d = subDays(endDate, i);
@@ -236,7 +228,28 @@ export default function Dashboard() {
       };
     }).reverse();
 
-    return { totals: t, prevTotals: pt, totalAcceptRate: ar, totalReplyRate: rr, barData: bd, dailyData: dd };
+    // Группируем данные по кампаниям (сумма всех профилей для каждой кампании)
+    const ctMap: Record<string, any> = {};
+    profiles.forEach(p => {
+      (p.campaigns || []).forEach(c => {
+        if (!ctMap[c.name]) {
+          ctMap[c.name] = { 
+            name: c.name, 
+            invites: 0, 
+            accepted: 0, 
+            messages: 0, 
+            replies: 0 
+          };
+        }
+        ctMap[c.name].invites += (c.invites || 0);
+        ctMap[c.name].accepted += (c.accepted || 0);
+        ctMap[c.name].messages += (c.messages || 0);
+        ctMap[c.name].replies += (c.replies || 0);
+      });
+    });
+    const ct = Object.values(ctMap);
+
+    return { totals: t, prevTotals: pt, totalAcceptRate: ar, totalReplyRate: rr, barData: bd, dailyData: dd, campaignData: ct };
   }, [profiles, prevProfiles, startDate, endDate]);
 
   const toggleExpand = (name: string) => {
@@ -387,56 +400,36 @@ export default function Dashboard() {
                     </tr>
 
                     {/* Развернутые строки (кампании) */}
-                    {isExpanded && profile.campaigns && profile.campaigns.map((camp: any, cIdx: number) => (
-                      <tr key={`${profile.name}-${camp.name}`} className="bg-slate-800/30 border-b border-slate-700/20 last:border-slate-700/40 hover:bg-slate-700/30 transition-colors text-[0.825rem]">
-                        <td className="px-5 py-2.5"></td>
-                        <td className="px-4 py-2.5 text-slate-300 pl-8 flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
-                          {camp.name}
-                        </td>
-                        
-                        <StatCell value={camp.invites} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.accepted} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.acceptRate} previousValue={0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
-                        
-                        <StatCell value={camp.messages} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.replies} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.replyRate} previousValue={0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
-                        
-                        <StatCell value={camp.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.sql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.partner} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.clients} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400 font-medium" rowIndex={idx + 1} />
-                      </tr>
-                    ))}
-
-                    {/* Развернутые строки (кампании - пока пусто) */}
-                    {isExpanded && profile.campaigns && profile.campaigns.map((camp: any, cIdx: number) => (
-                      <tr key={`${profile.name}-${camp.name}`} className="bg-slate-800/30 border-b border-slate-700/20 last:border-slate-700/40 hover:bg-slate-700/30 transition-colors text-[0.825rem]">
-                        <td className="px-5 py-2.5"></td>
-                        <td className="px-4 py-2.5 text-slate-300 pl-8 flex items-center gap-2">
-                          <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
-                          {camp.name}
-                        </td>
-                        
-                        <StatCell value={camp.invites} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.accepted} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.acceptRate} previousValue={0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
-                        
-                        <StatCell value={camp.messages} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.replies} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.replyRate} previousValue={0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
-                        
-                        <StatCell value={camp.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.sql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.partner} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                        <StatCell value={camp.clients} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400 font-medium" rowIndex={idx + 1} />
-                      </tr>
-                    ))}
+                    {isExpanded && profile.campaigns && profile.campaigns.map((camp: any, cIdx: number) => {
+                      // Находим данные по этой же кампании за прошлый период
+                      const prevProfileForCamp = prevProfiles.find(p => p.name === profile.name);
+                      const prevCamp = (prevProfileForCamp?.campaigns || []).find((pc: any) => pc.name === camp.name);
+                      
+                      return (
+                        <tr key={`${profile.name}-${camp.name}`} className="bg-slate-800/30 border-b border-slate-700/20 last:border-slate-700/40 hover:bg-slate-700/30 transition-colors text-[0.825rem]">
+                          <td className="px-5 py-2.5"></td>
+                          <td className="px-4 py-2.5 text-slate-300 pl-8 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
+                            {camp.name}
+                          </td>
+                          
+                          <StatCell value={camp.invites} previousValue={prevCamp?.invites || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.accepted} previousValue={prevCamp?.accepted || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.acceptRate} previousValue={prevCamp?.acceptRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
+                          
+                          <StatCell value={camp.messages} previousValue={prevCamp?.messages || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.replies} previousValue={prevCamp?.replies || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.replyRate} previousValue={prevCamp?.replyRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
+                          
+                          <StatCell value={camp.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.sql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.partner} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.clients} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400 font-medium" rowIndex={idx + 1} />
+                        </tr>
+                      );
+                    })}
                   </Fragment>
                 );
               })}
@@ -466,7 +459,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <DashboardCharts dailyData={dailyData} barData={barData} />
+      <DashboardCharts dailyData={dailyData} barData={barData} campaignData={campaignData} />
     </div>
   );
 }

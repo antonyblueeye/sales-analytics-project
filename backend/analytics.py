@@ -66,3 +66,59 @@ def get_profiles_summary(db: Session, from_date: date, to_date: date):
         }
         for row in result
     ]
+
+
+def get_campaigns_summary(db: Session, from_date: date, to_date: date):
+    """
+    Возвращает сводку по кампейнам: инвайты, принятые, сообщения, ответы и проценты.
+    Фильтрует действия по диапазону дат (performed_at).
+    """
+    # Сдвигаем конечную дату на +1 день, чтобы поиск захватил весь последний день (до 23:59:59)
+    # так как performed_at содержит время.
+    from datetime import timedelta
+    next_day = to_date + timedelta(days=1)
+    
+    sql = text("""
+        with clean_campaigns as (
+            select 
+                id,
+                trim(regexp_replace(name, '\s*(\[[^\]]*\]|\([^\)]*\))', '', 'g')) AS clean_campaign
+            from campaigns
+        )
+        select 
+            cc.clean_campaign,
+            p.name,
+            count(*) filter (where a.action_type = 'invited') as invited,
+            count(*) filter (where a.action_type = 'accepted') as accepted,
+            coalesce(round(
+                count(*) filter (where a.action_type = 'accepted')::numeric / 
+                nullif(count(*) filter (where a.action_type = 'invited'), 0) * 100, 2
+            ), 0) as acceptance_rate,
+            count(*) filter (where a.action_type = 'message sent') as messaged,
+            count(*) filter (where a.action_type = 'replied') as replied,
+            coalesce(round(
+                count(*) filter (where a.action_type = 'replied')::numeric / 
+                nullif(count(*) filter (where a.action_type = 'message sent'), 0) * 100, 2
+            ), 0) as reply_rate
+        from actions a
+        left join clean_campaigns cc on a.campaign_id = cc.id
+        left join profiles p on a.profile_id = p.id
+        where a.performed_at >= :from_date and a.performed_at < :next_day
+        group by cc.clean_campaign, p.name
+        order by p.name;    
+    """)
+    result = db.execute(sql, {"from_date": from_date, "next_day": next_day})
+    # Превращаем результат в список словарей для удобства фронта
+    return [
+        {
+            "campaign_name": row.clean_campaign,
+            "profile_name": row.name,
+            "invited": row.invited,
+            "accepted": row.accepted,
+            "acceptance_rate": row.acceptance_rate,
+            "messaged": row.messaged,
+            "replied": row.replied,
+            "reply_rate": row.reply_rate
+        }
+        for row in result
+    ]
