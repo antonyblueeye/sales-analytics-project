@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
-import { DayPicker } from 'react-day-picker';
+import { DayPicker, DateRange } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
 import 'react-day-picker/dist/style.css';
 import { 
@@ -33,6 +33,8 @@ interface Lead {
     status: string;
     location: string;
     campaign: string;
+    campaignNames: string;
+    profileNames: string;
     email: string;
     linkedinUrl: string;
     hubspotUrl: string;
@@ -87,7 +89,11 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
             </div>
 
             {isOpen && (
-                <div className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}>
+                <div 
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
+                >
                     <style dangerouslySetInnerHTML={{ __html: `
                         .rdp-root {
                             --rdp-accent-color: #6366f1;
@@ -109,10 +115,106 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                         onSelect={(d) => {
                             if (d) {
                                 onSelect(format(d, 'yyyy-MM-dd'));
-                                setIsOpen(false);
                             }
                         }}
                     />
+                    <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
+                        <button 
+                            onClick={() => setIsOpen(false)}
+                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                        >
+                            Apply
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+interface DateRangePickerButtonProps {
+    range: DateRange | undefined;
+    onSelect: (range: DateRange | undefined) => void;
+    label?: string;
+    className?: string;
+    popoverDirection?: 'up' | 'down';
+}
+
+const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirection = 'down' }: DateRangePickerButtonProps) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (ref.current && !ref.current.contains(event.target as Node)) setIsOpen(false);
+        };
+        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isOpen]);
+
+    const displayText = () => {
+        if (!range?.from) return label || 'Select range';
+        if (!range.to) return format(range.from, 'MMM dd, yyyy');
+        return `${format(range.from, 'MMM dd')} - ${format(range.to, 'MMM dd, yyyy')}`;
+    };
+
+    return (
+        <div className={`relative ${className}`} ref={ref}>
+            <div className="relative group">
+                <button 
+                    onClick={() => setIsOpen(!isOpen)}
+                    className="w-full flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 hover:border-slate-500 transition-all focus:ring-1 focus:ring-indigo-500 outline-none h-[30px] pr-8"
+                >
+                    <CalendarIcon size={14} className="text-indigo-400 shrink-0" />
+                    <span className="truncate">{displayText()}</span>
+                </button>
+                {range?.from && (
+                    <button 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onSelect(undefined);
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-700 rounded-md text-slate-500 hover:text-slate-200 transition-all"
+                    >
+                        <X size={12} />
+                    </button>
+                )}
+            </div>
+
+            {isOpen && (
+                <div 
+                    onClick={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
+                >
+                    <style dangerouslySetInnerHTML={{ __html: `
+                        .rdp-root {
+                            --rdp-accent-color: #6366f1;
+                            --rdp-accent-background-color: rgba(99, 102, 241, 0.15);
+                            --rdp-background-color: #334155;
+                            margin: 0;
+                            font-size: 13px;
+                        }
+                        .rdp-day { border-radius: 8px; }
+                        .rdp-day_selected { background-color: var(--rdp-accent-color) !important; color: white !important; }
+                        .rdp-button_nav { border: 1px solid #334155; border-radius: 6px; color: #cbd5e1; height: 28px; width: 28px; }
+                        .rdp-button_nav:hover { background-color: #334155; color: white; }
+                        .rdp-caption_label { font-weight: 600; font-size: 14px; color: #f8fafc; }
+                        .rdp-weekday { color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 600; }
+                    `}} />
+                    <DayPicker
+                        mode="range"
+                        selected={range}
+                        onSelect={onSelect}
+                    />
+                    <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
+                        <button 
+                            onClick={() => setIsOpen(false)}
+                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                        >
+                            Apply
+                        </button>
+                    </div>
                 </div>
             )}
         </div>
@@ -145,6 +247,7 @@ export default function CRMPage() {
     const [activeTab, setActiveTab] = useState<'all' | 'replied'>('all');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null);
 
+
     // Filter states
     const [filterCampaign, setFilterCampaign] = useState('');
     const [filterStatus, setFilterStatus] = useState('');
@@ -153,8 +256,8 @@ export default function CRMPage() {
     const [filterLocation, setFilterLocation] = useState('');
     const [filterFirstName, setFilterFirstName] = useState('');
     const [filterLastName, setFilterLastName] = useState('');
-    const [filterCreateDate, setFilterCreateDate] = useState('');
-    const [filterActivityDate, setFilterActivityDate] = useState('');
+    const [filterCreateDate, setFilterCreateDate] = useState<DateRange | undefined>(undefined);
+    const [filterActivityDate, setFilterActivityDate] = useState<DateRange | undefined>(undefined);
 
     const fetchLeads = async (page: number, currentFilters: any = {}) => {
         setIsLoading(true);
@@ -188,7 +291,9 @@ export default function CRMPage() {
                 photo: l.photo_url || `https://ui-avatars.com/api/?name=${l.first_name}+${l.last_name}&background=6366f1&color=fff`,
                 status: activeTab === 'replied' ? 'Replied' : l.status,
                 location: l.location,
-                campaign: 'N/A',
+                campaign: l.campaign_names || 'N/A',
+                campaignNames: l.campaign_names || '',
+                profileNames: l.profile_names || '',
                 email: l.email,
                 linkedinUrl: l.linkedin_url,
                 hubspotUrl: '', 
@@ -345,7 +450,7 @@ export default function CRMPage() {
         filterCampaign, filterStatus, filterPosition, filterCompany, 
         filterLocation, filterFirstName, filterLastName, 
         filterCreateDate, filterActivityDate
-    ].filter(f => f !== '').length;
+    ].filter(f => f && f !== '').length;
 
     const clearAllFilters = () => {
         setFilterCampaign('');
@@ -355,8 +460,8 @@ export default function CRMPage() {
         setFilterLocation('');
         setFilterFirstName('');
         setFilterLastName('');
-        setFilterCreateDate('');
-        setFilterActivityDate('');
+        setFilterCreateDate(undefined);
+        setFilterActivityDate(undefined);
     };
 
     return (
@@ -488,18 +593,18 @@ export default function CRMPage() {
                                 onChange={(e) => setFilterLocation(e.target.value)}
                             />
                         </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1 whitespace-nowrap">Create Date</label>
-                            <DatePickerButton 
-                                date={filterCreateDate}
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Created At</label>
+                            <DateRangePickerButton 
+                                range={filterCreateDate}
                                 onSelect={setFilterCreateDate}
                                 label="All time"
                             />
                         </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1 whitespace-nowrap">Last Activity</label>
-                            <DatePickerButton 
-                                date={filterActivityDate}
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Last Activity</label>
+                            <DateRangePickerButton 
+                                range={filterActivityDate}
                                 onSelect={setFilterActivityDate}
                                 label="All time"
                             />
@@ -733,6 +838,51 @@ export default function CRMPage() {
                                             </div>
                                         )}
                                     </div>
+                                </section>
+                                
+                                {/* Campaigns & Profiles */}
+                                <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(activeLead?.campaignNames && activeLead.campaignNames.trim() !== '') && (
+                                        <div className="flex flex-col gap-3">
+                                            <h3 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                                Campaigns
+                                            </h3>
+                                            <div className="flex flex-wrap gap-2">
+                                                {activeLead.campaignNames.split(', ').map((name, i) => (
+                                                    <span key={i} className="px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 rounded-xl text-[11px] font-bold shadow-sm">
+                                                        {name}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(activeLead?.profileNames && activeLead.profileNames.trim() !== '') && (
+                                        <div className="flex flex-col gap-3">
+                                            <h3 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                Source Profiles
+                                            </h3>
+                                            <div className="flex flex-wrap gap-3">
+                                                {activeLead.profileNames.split(', ').map((name, i) => (
+                                                    <div key={i} className="flex items-center gap-2.5 p-1.5 pr-3 bg-slate-800/40 border border-slate-700/50 rounded-2xl group/profile hover:bg-slate-800 transition-all">
+                                                        <div className="relative">
+                                                            <img 
+                                                                src={`/${name}.jpg`} 
+                                                                onError={(e) => {
+                                                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&bold=true`;
+                                                                }}
+                                                                className="w-7 h-7 rounded-full object-cover border border-slate-600 ring-2 ring-transparent group-hover/profile:ring-indigo-500/50 transition-all shadow-md" 
+                                                                alt={name} 
+                                                            />
+                                                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-sm" />
+                                                        </div>
+                                                        <span className="text-[11px] text-slate-300 font-bold whitespace-nowrap">{name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </section>
 
                                 {/* Log Activity */}

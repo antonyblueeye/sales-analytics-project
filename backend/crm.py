@@ -60,15 +60,21 @@ def get_leads_list(
             coalesce(l.current_employer, '') as company_name,
             coalesce(l.current_title, '') as title,
             coalesce(l.location, '') as location,
-            COALESCE(st.status, 'New') as status
+            COALESCE(st.status, 'New') as status,
+            coalesce(st.campaign_names, '') as campaign_names,
+            coalesce(st.profile_names, '') as profile_names
         FROM leads l
         LEFT JOIN (
-            SELECT lead_id, 
-                   CASE WHEN COUNT(CASE WHEN action_type = 'replied' THEN 1 END) > 0 THEN 'Replied'
+            SELECT a.lead_id, 
+                   CASE WHEN COUNT(CASE WHEN a.action_type = 'replied' THEN 1 END) > 0 THEN 'Replied'
                         WHEN COUNT(*) > 0 THEN 'Connected'
-                        ELSE 'New' END as status
-            FROM actions
-            GROUP BY lead_id
+                        ELSE 'New' END as status,
+                   string_agg(DISTINCT c.name, ', ') as campaign_names,
+                   string_agg(DISTINCT p.name, ', ') as profile_names
+            FROM actions a
+            LEFT JOIN campaigns c ON a.campaign_id = c.id
+            LEFT JOIN profiles p ON a.profile_id = p.id
+            GROUP BY a.lead_id
         ) st ON l.id = st.lead_id
         {where_sql}
         ORDER BY l.id
@@ -144,8 +150,18 @@ def get_replied_leads(db: Session, page: int = 1, limit: int = 20):
         
     lead_ids = [row['lead_id'] for row in lead_data_list]
     
-    # Fetch detailed info and ALL messages for these leads
+    # Fetch detailed info, ALL messages, and all campaigns/profiles for these leads
     detailed_query = text("""
+        WITH lead_metadata AS (
+            SELECT a.lead_id,
+                   string_agg(DISTINCT c.name, ', ') as campaign_names,
+                   string_agg(DISTINCT p.name, ', ') as profile_names
+            FROM actions a
+            LEFT JOIN campaigns c ON a.campaign_id = c.id
+            LEFT JOIN profiles p ON a.profile_id = p.id
+            WHERE a.lead_id IN :lead_ids
+            GROUP BY a.lead_id
+        )
         SELECT
             l.id as lead_id,
             coalesce(l.first_name, '') as first_name,
@@ -156,11 +172,14 @@ def get_replied_leads(db: Session, page: int = 1, limit: int = 20):
             coalesce(l.current_employer, '') as company_name,
             coalesce(l.current_title, '') as title,
             coalesce(l.location, '') as location,
+            m.campaign_names,
+            m.profile_names,
             a.message,
             a.action_type,
             a.performed_at
         FROM leads l
         JOIN actions a ON l.id = a.lead_id
+        LEFT JOIN lead_metadata m ON l.id = m.lead_id
         WHERE l.id IN :lead_ids AND a.message <> ''
         ORDER BY a.performed_at ASC
     """)
@@ -185,6 +204,8 @@ def get_replied_leads(db: Session, page: int = 1, limit: int = 20):
                 "title": r['title'],
                 "location": r['location'],
                 "status": "Replied",
+                "campaign_names": r['campaign_names'] or '',
+                "profile_names": r['profile_names'] or '',
                 "last_reply_at": last_reply.isoformat() if last_reply else None,
                 "messages": []
             }

@@ -380,7 +380,22 @@ export default function Dashboard() {
                           <ChevronRight size={18} />
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 font-semibold text-slate-100 whitespace-nowrap">{profile.name}</td>
+                      <td className="px-4 py-3.5 font-bold text-slate-100 whitespace-nowrap">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <img 
+                              src={`/${profile.name}.jpg`} 
+                              className="w-8 h-8 rounded-full object-cover border border-slate-700 ring-2 ring-indigo-500/20 shadow-lg"
+                              alt={profile.name}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=4f46e5&color=fff&bold=true`;
+                              }}
+                            />
+                            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
+                          </div>
+                          {profile.name}
+                        </div>
+                      </td>
                       
                       <StatCell value={profile.invites} previousValue={prevProfile?.invites || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
                       <StatCell value={profile.accepted} previousValue={prevProfile?.accepted || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
