@@ -11,6 +11,12 @@ const DashboardCharts = dynamic(() => import('./components/charts/DashboardChart
   loading: () => <div className="h-[600px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading charts...</div>
 });
 
+const CampaignHistorySection = dynamic(() => import('./components/charts/CampaignHistorySection'), {
+  ssr: false,
+  loading: () => <div className="h-[400px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading historical analytics...</div>
+});
+
+
 // Пример данных для таблицы профилей (теперь с кампаниями)
 
 // Описание структуры данных профиля для TypeScript
@@ -382,10 +388,10 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-3.5 font-bold text-slate-100 whitespace-nowrap">
                         <div className="flex items-center gap-3">
-                          <div className="relative">
+                          <div className="relative shrink-0">
                             <img 
                               src={`/${profile.name}.jpg`} 
-                              className="w-8 h-8 rounded-full object-cover border border-slate-700 ring-2 ring-indigo-500/20 shadow-lg"
+                              className="w-8 h-8 rounded-full object-cover aspect-square shrink-0 border border-slate-700 ring-2 ring-indigo-500/20 shadow-lg"
                               alt={profile.name}
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=4f46e5&color=fff&bold=true`;
@@ -475,6 +481,7 @@ export default function Dashboard() {
       </div>
 
       <DashboardCharts dailyData={dailyData} barData={barData} campaignData={campaignData} />
+      <CampaignHistorySection />
     </div>
   );
-}
+}

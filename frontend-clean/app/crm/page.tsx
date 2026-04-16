@@ -638,7 +638,9 @@ export default function CRMPage() {
                             >
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
-                                        <img src={lead.photo} className="w-10 h-10 rounded-full object-cover border-2 border-slate-700 group-hover:border-indigo-500/50 transition-colors" alt="" />
+                                        <div className="shrink-0">
+                                            <img src={lead.photo} className="w-10 h-10 rounded-full object-cover aspect-square shrink-0 border-2 border-slate-700 group-hover:border-indigo-500/50 transition-colors" alt="" />
+                                        </div>
                                         <div>
                                             <div className="text-sm font-semibold text-slate-100">{lead.firstName} {lead.lastName}</div>
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold mt-1 ${statusColors[lead.status]}`}>
@@ -765,7 +767,9 @@ export default function CRMPage() {
                             {/* Drawer Header */}
                             <div className="p-6 border-b border-slate-800 flex items-start justify-between">
                                 <div className="flex gap-4">
-                                    <img src={activeLead?.photo} className="w-20 h-20 rounded-2xl object-cover border-2 border-slate-700" alt="" />
+                                    <div className="shrink-0">
+                                        <img src={activeLead?.photo} className="w-20 h-20 rounded-2xl object-cover aspect-square shrink-0 border-2 border-slate-700" alt="" />
+                                    </div>
                                     <div className="pt-1">
                                         <h2 className="text-xl font-bold text-slate-100">{activeLead?.firstName} {activeLead?.lastName}</h2>
                                         <p className="text-slate-400 text-sm mt-0.5">{activeLead?.title} @ <span className="text-indigo-400 font-medium">{activeLead?.company}</span></p>

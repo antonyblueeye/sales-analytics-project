@@ -6,7 +6,7 @@ from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
 from models import Base, Campaign, Profile, Lead, Action
-from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary
+from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history
 from typing import Optional
 from datetime import datetime, time, timedelta, date
 from crm import get_leads_list, get_replied_leads
@@ -178,3 +178,16 @@ def crm_replied_leads(
 ):
     data = get_replied_leads(db, page, limit)
     return data
+
+@app.get("/analytics/campaigns-list")
+def campaigns_list(db: Session = Depends(get_db)):
+    return get_campaigns_list(db)
+
+@app.get("/analytics/campaign-history")
+def campaign_history(
+    campaign_name: str,
+    granularity: str = "day",
+    db: Session = Depends(get_db)
+):
+    return get_campaign_history(db, campaign_name, granularity)
+

@@ -122,3 +122,54 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
         }
         for row in result
     ]
+
+def get_campaigns_list(db: Session):
+    """
+    Returns a unique list of campaign names after cleaning (removing [Tags] etc.)
+    """
+    sql = text("""
+        SELECT DISTINCT trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign
+        FROM campaigns
+        WHERE name IS NOT NULL
+        ORDER BY clean_campaign
+    """)
+    result = db.execute(sql)
+    return [row.clean_campaign for row in result if row.clean_campaign]
+
+def get_campaign_history(db: Session, campaign_name: str, granularity: str):
+    """
+    Returns historical data for a specific campaign aggregated by day, week, or month.
+    """
+    if granularity not in ['day', 'week', 'month']:
+        granularity = 'day'
+        
+    sql = text(f"""
+        WITH clean_campaigns AS (
+            SELECT 
+                id,
+                trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign
+            FROM campaigns
+        )
+        SELECT 
+            date_trunc('{granularity}', a.performed_at) as period,
+            COUNT(*) FILTER (WHERE a.action_type = 'invited') AS invited,
+            COUNT(*) FILTER (WHERE a.action_type = 'accepted') AS accepted,
+            COUNT(*) FILTER (WHERE a.action_type = 'message sent') AS messaged,
+            COUNT(*) FILTER (WHERE a.action_type = 'replied') AS replied
+        FROM actions a
+        JOIN clean_campaigns cc ON a.campaign_id = cc.id
+        WHERE cc.clean_campaign = :campaign_name
+        GROUP BY period
+        ORDER BY period
+    """)
+    result = db.execute(sql, {"campaign_name": campaign_name})
+    return [
+        {
+            "period": row.period.isoformat(),
+            "invited": row.invited,
+            "accepted": row.accepted,
+            "messaged": row.messaged,
+            "replied": row.replied
+        }
+        for row in result
+    ]

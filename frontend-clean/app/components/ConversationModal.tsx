@@ -39,7 +39,9 @@ export default function ConversationModal({ lead, onClose }: ConversationModalPr
                 {/* Заголовок */}
                 <div className="flex justify-between items-center p-4 border-b border-slate-700">
                     <div className="flex items-center gap-3">
-                        <img src={lead.photo} alt={lead.name} className="w-10 h-10 rounded-full" />
+                        <div className="shrink-0">
+                            <img src={lead.photo} alt={lead.name} className="w-10 h-10 rounded-full object-cover aspect-square shrink-0" />
+                        </div>
                         <div>
                             <h2 className="font-semibold">{lead.name}</h2>
                             <p className="text-sm text-slate-400">{lead.title} at {lead.company}</p>
