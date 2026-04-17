@@ -3,7 +3,7 @@ import { useState, useMemo, Fragment, ReactNode, useEffect, useCallback } from '
 import dynamic from 'next/dynamic';
 import DateRangePicker from './components/DateRangePicker';
 import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus, Loader2 } from 'lucide-react';
-import { format, subDays, differenceInDays } from 'date-fns';
+import { format, subDays, differenceInDays, startOfWeek } from 'date-fns';
 import axios from 'axios';
 
 const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
@@ -15,9 +15,6 @@ const CampaignHistorySection = dynamic(() => import('./components/charts/Campaig
   ssr: false,
   loading: () => <div className="h-[400px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading historical analytics...</div>
 });
-
-
-// Пример данных для таблицы профилей (теперь с кампаниями)
 
 // Описание структуры данных профиля для TypeScript
 type ProfileData = {
@@ -65,7 +62,7 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
   const showBelow = rowIndex < 2;
 
   return (
-    <td 
+    <td
       className={`px-4 py-3.5 text-right font-medium relative group ${customClass}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
@@ -108,13 +105,14 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
 };
 
 export default function Dashboard() {
-  const [startDate, setStartDate] = useState(subDays(new Date(), 30));
+  const [startDate, setStartDate] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [endDate, setEndDate] = useState(new Date());
   const [profiles, setProfiles] = useState<ProfileData[]>([]); // Данные текущего периода
   const [prevProfiles, setPrevProfiles] = useState<ProfileData[]>([]); // Данные предыдущего периода для сравнения
   const [isLoading, setIsLoading] = useState(true); // Состояние загрузки (крутилка)
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{ key: ProfileKeys, direction: 'asc' | 'desc' } | null>(null);
+  const [dailyData, setDailyData] = useState<any[]>([]);
 
   // Функция для запроса данных из Python бэкенда
   const fetchProfiles = useCallback(async () => {
@@ -126,7 +124,7 @@ export default function Dashboard() {
       const prevEnd = subDays(startDate, 1);
 
       // Запускаем все запросы параллельно: профили и кампании (текущие и прошлые)
-      const [currRes, prevRes, currCampRes, prevCampRes] = await Promise.all([
+      const [currRes, prevRes, currCampRes, prevCampRes, dailyRes] = await Promise.all([
         axios.get('http://localhost:8000/analytics/profiles-summary', {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         }),
@@ -138,6 +136,9 @@ export default function Dashboard() {
         }),
         axios.get('http://localhost:8000/analytics/campaigns-summary', {
           params: { from_date: format(prevStart, 'yyyy-MM-dd'), to_date: format(prevEnd, 'yyyy-MM-dd') }
+        }),
+        axios.get('http://localhost:8000/analytics/daily-summary', {
+          params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         })
       ]);
 
@@ -187,6 +188,7 @@ export default function Dashboard() {
 
       setProfiles(currRes.data.map((item: any) => mapItem(item, currCamps)));
       setPrevProfiles(prevRes.data.map((item: any) => mapItem(item, prevCamps)));
+      setDailyData(dailyRes.data);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -200,7 +202,7 @@ export default function Dashboard() {
   }, [fetchProfiles]);
 
   // useMemo пересчитывает итоги и данные для графиков ТОЛЬКО когда меняются данные профилей или даты
-  const { totals, prevTotals, totalAcceptRate, totalReplyRate, barData, dailyData, campaignData } = useMemo(() => {
+  const { totals, prevTotals, totalAcceptRate, totalReplyRate, barData, campaignData } = useMemo(() => {
     const calculateTotals = (data: ProfileData[]) => data.reduce((acc, curr) => {
       acc.invites += curr.invites;
       acc.accepted += curr.accepted;
@@ -223,28 +225,19 @@ export default function Dashboard() {
       replies: p.replies
     }));
 
-    // Генерируем "фейковую" динамику по дням для визуализации в графике (Area Chart)
-    const days = differenceInDays(endDate, startDate) + 1;
-    const dd = Array.from({ length: Math.min(days, 14) }).map((_, i) => {
-      const d = subDays(endDate, i);
-      return {
-        date: format(d, 'yyyy-MM-dd'),
-        invites: Math.round((t.invites / days) * (0.8 + Math.random() * 0.4)),
-        accepted: Math.round((t.accepted / days) * (0.8 + Math.random() * 0.4))
-      };
-    }).reverse();
+    // ГЕНЕРАЦИЯ ДАННЫХ ДЛЯ ГРАФИКА УДАЛЕНА - теперь они приходят с бэкенда
 
     // Группируем данные по кампаниям (сумма всех профилей для каждой кампании)
     const ctMap: Record<string, any> = {};
     profiles.forEach(p => {
       (p.campaigns || []).forEach(c => {
         if (!ctMap[c.name]) {
-          ctMap[c.name] = { 
-            name: c.name, 
-            invites: 0, 
-            accepted: 0, 
-            messages: 0, 
-            replies: 0 
+          ctMap[c.name] = {
+            name: c.name,
+            invites: 0,
+            accepted: 0,
+            messages: 0,
+            replies: 0
           };
         }
         ctMap[c.name].invites += (c.invites || 0);
@@ -255,7 +248,7 @@ export default function Dashboard() {
     });
     const ct = Object.values(ctMap);
 
-    return { totals: t, prevTotals: pt, totalAcceptRate: ar, totalReplyRate: rr, barData: bd, dailyData: dd, campaignData: ct };
+    return { totals: t, prevTotals: pt, totalAcceptRate: ar, totalReplyRate: rr, barData: bd, campaignData: ct };
   }, [profiles, prevProfiles, startDate, endDate]);
 
   const toggleExpand = (name: string) => {
@@ -315,12 +308,12 @@ export default function Dashboard() {
 
   // Helper to generate mock previous stats (static but derived)
   const getPrevStat = (val: number | string, seed: string) => {
-      const num = typeof val === 'string' ? parseFloat(val) : val;
-      // Stably generate a variation based on the name/value
-      const hash = seed.length;
-      const variation = (hash % 15) - 7; // -7 to +7
-      const result = num - variation;
-      return typeof val === 'string' ? result.toFixed(1) : Math.round(result);
+    const num = typeof val === 'string' ? parseFloat(val) : val;
+    // Stably generate a variation based on the name/value
+    const hash = seed.length;
+    const variation = (hash % 15) - 7; // -7 to +7
+    const result = num - variation;
+    return typeof val === 'string' ? result.toFixed(1) : Math.round(result);
   };
 
   return (
@@ -373,7 +366,7 @@ export default function Dashboard() {
                 const isExpanded = expandedProfiles.has(profile.name);
                 // Находим этот же профиль в данных прошлого периода
                 const prevProfile = prevProfiles.find(p => p.name === profile.name);
-                
+
                 return (
                   <Fragment key={profile.name}>
                     <tr
@@ -389,8 +382,8 @@ export default function Dashboard() {
                       <td className="px-4 py-3.5 font-bold text-slate-100 whitespace-nowrap">
                         <div className="flex items-center gap-3">
                           <div className="relative shrink-0">
-                            <img 
-                              src={`/${profile.name}.jpg`} 
+                            <img
+                              src={`/${profile.name}.jpg`}
                               className="w-8 h-8 rounded-full object-cover aspect-square shrink-0 border border-slate-700 ring-2 ring-indigo-500/20 shadow-lg"
                               alt={profile.name}
                               onError={(e) => {
@@ -402,15 +395,15 @@ export default function Dashboard() {
                           {profile.name}
                         </div>
                       </td>
-                      
+
                       <StatCell value={profile.invites} previousValue={prevProfile?.invites || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
                       <StatCell value={profile.accepted} previousValue={prevProfile?.accepted || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
                       <StatCell value={profile.acceptRate} previousValue={prevProfile?.acceptRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-emerald-400 bg-emerald-400/5 rounded-md my-1" rowIndex={idx} />
-                      
+
                       <StatCell value={profile.messages} previousValue={prevProfile?.messages || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
                       <StatCell value={profile.replies} previousValue={prevProfile?.replies || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
                       <StatCell value={profile.replyRate} previousValue={prevProfile?.replyRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-indigo-400 bg-indigo-400/5 rounded-md my-1" rowIndex={idx} />
-                      
+
                       {/* Placeholder stats (interested, calls, etc.) */}
                       <StatCell value={profile.interested} previousValue={0} startDate={startDate} endDate={endDate} rowIndex={idx} />
                       <StatCell value={profile.calls} previousValue={0} startDate={startDate} endDate={endDate} rowIndex={idx} />
@@ -425,7 +418,7 @@ export default function Dashboard() {
                       // Находим данные по этой же кампании за прошлый период
                       const prevProfileForCamp = prevProfiles.find(p => p.name === profile.name);
                       const prevCamp = (prevProfileForCamp?.campaigns || []).find((pc: any) => pc.name === camp.name);
-                      
+
                       return (
                         <tr key={`${profile.name}-${camp.name}`} className="bg-slate-800/30 border-b border-slate-700/20 last:border-slate-700/40 hover:bg-slate-700/30 transition-colors text-[0.825rem]">
                           <td className="px-5 py-2.5"></td>
@@ -433,15 +426,15 @@ export default function Dashboard() {
                             <div className="w-1.5 h-1.5 rounded-full bg-slate-500"></div>
                             {camp.name}
                           </td>
-                          
+
                           <StatCell value={camp.invites} previousValue={prevCamp?.invites || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.accepted} previousValue={prevCamp?.accepted || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.acceptRate} previousValue={prevCamp?.acceptRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
-                          
+
                           <StatCell value={camp.messages} previousValue={prevCamp?.messages || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.replies} previousValue={prevCamp?.replies || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.replyRate} previousValue={prevCamp?.replyRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
-                          
+
                           <StatCell value={camp.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
@@ -459,15 +452,15 @@ export default function Dashboard() {
               <tr>
                 <td className="px-5 py-4 w-10"></td>
                 <td className="px-4 py-4 text-left tracking-wide">TOTAL</td>
-                
+
                 <StatCell value={totals.invites} previousValue={prevTotals.invites} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totals.accepted} previousValue={prevTotals.accepted} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totalAcceptRate} previousValue={((prevTotals.accepted / (prevTotals.invites || 1)) * 100).toFixed(1)} startDate={startDate} endDate={endDate} isPercentage customClass="text-emerald-400" rowIndex={999} />
-                
+
                 <StatCell value={totals.messages} previousValue={prevTotals.messages} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totals.replies} previousValue={prevTotals.replies} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totalReplyRate} previousValue={((prevTotals.replies / (prevTotals.messages || 1)) * 100).toFixed(1)} startDate={startDate} endDate={endDate} isPercentage customClass="text-indigo-400" rowIndex={999} />
-                
+
                 <StatCell value={totals.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totals.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totals.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={999} />
@@ -484,4 +477,4 @@ export default function Dashboard() {
       <CampaignHistorySection />
     </div>
   );
-}
+}

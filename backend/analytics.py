@@ -172,4 +172,35 @@ def get_campaign_history(db: Session, campaign_name: str, granularity: str):
             "replied": row.replied
         }
         for row in result
+    ]
+
+def get_daily_summary(db: Session, from_date: date, to_date: date):
+    """
+    Returns daily aggregates of actions (invites, accepts, messages, replies) across the dataset.
+    """
+    from datetime import timedelta
+    next_day = to_date + timedelta(days=1)
+    
+    sql = text("""
+        SELECT 
+            date_trunc('day', a.performed_at) as date,
+            COUNT(*) FILTER (WHERE a.action_type = 'invited') AS invites,
+            COUNT(*) FILTER (WHERE a.action_type = 'accepted') AS accepted,
+            COUNT(*) FILTER (WHERE a.action_type = 'message sent') AS messages,
+            COUNT(*) FILTER (WHERE a.action_type = 'replied') AS replies
+        FROM actions a
+        WHERE a.performed_at >= :from_date AND a.performed_at < :next_day
+        GROUP BY date
+        ORDER BY date
+    """)
+    result = db.execute(sql, {"from_date": from_date, "next_day": next_day})
+    return [
+        {
+            "date": row.date.date().isoformat(),
+            "invites": row.invites,
+            "accepted": row.accepted,
+            "messages": row.messages,
+            "replies": row.replies
+        }
+        for row in result
     ]

@@ -191,3 +191,12 @@ def campaign_history(
 ):
     return get_campaign_history(db, campaign_name, granularity)
 
+@app.get("/analytics/daily-summary")
+def daily_summary(
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db)
+):
+    from analytics import get_daily_summary
+    data = get_daily_summary(db, from_date, to_date)
+    return data

@@ -15,7 +15,7 @@ interface DashboardChartsProps {
 
 const COLORS = ['#82ca9d', '#ef4444']; // Green for success, Red for "pending/no response"
 
-const PieGroup = ({ title, data, dataKeys, labels }: { title: string, data: any[], dataKeys: { success: string, total: string }, labels: { success: string, fail: string } }) => {
+const PieGroup = ({ title, data, dataKeys, labels, type, onTypeChange }: { title: string, data: any[], dataKeys: { success: string, total: string }, labels: { success: string, fail: string }, type?: 'invites' | 'messages', onTypeChange?: (val: 'invites' | 'messages') => void }) => {
   return (
     <div className="bg-[#1e293b]/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 text-slate-100 flex flex-col h-full">
       <style jsx global>{`
@@ -23,7 +23,25 @@ const PieGroup = ({ title, data, dataKeys, labels }: { title: string, data: any[
           outline: none !important;
         }
       `}</style>
-      <h2 className="text-xl font-bold mb-6 tracking-tight">{title}</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+        {onTypeChange && (
+          <div className="flex bg-slate-800/50 p-1 rounded-lg border border-slate-700/50 text-xs">
+            <button 
+              onClick={() => onTypeChange('invites')}
+              className={`px-3 py-1.5 rounded-md transition-colors ${type === 'invites' ? 'bg-indigo-500/20 text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Invites
+            </button>
+            <button 
+              onClick={() => onTypeChange('messages')}
+              className={`px-3 py-1.5 rounded-md transition-colors ${type === 'messages' ? 'bg-indigo-500/20 text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+            >
+              Messages
+            </button>
+          </div>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-4 flex-grow">
         {data.slice(0, 4).map((profile) => {
           const successVal = profile[dataKeys.success];
@@ -315,11 +333,30 @@ const CampaignCarouselChart = ({ data }: { data: any[] }) => {
 };
 
 export default function DashboardCharts({ dailyData, barData, campaignData }: DashboardChartsProps) {
+  const [dailyTrendsType, setDailyTrendsType] = useState<'invites' | 'messages'>('invites');
+  const [pieGroupType, setPieGroupType] = useState<'invites' | 'messages'>('invites');
+
   return (
     <div className="space-y-6 mt-6">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <div className="bg-[#1e293b]/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 text-slate-100 flex flex-col h-full">
-          <h2 className="text-xl font-bold mb-6 tracking-tight">Daily Activity Trends</h2>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-bold tracking-tight">Daily Activity Trends</h2>
+            <div className="flex bg-slate-800/50 p-1 rounded-lg border border-slate-700/50 text-xs">
+              <button 
+                onClick={() => setDailyTrendsType('invites')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${dailyTrendsType === 'invites' ? 'bg-indigo-500/20 text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Invites
+              </button>
+              <button 
+                onClick={() => setDailyTrendsType('messages')}
+                className={`px-3 py-1.5 rounded-md transition-colors ${dailyTrendsType === 'messages' ? 'bg-indigo-500/20 text-indigo-400 font-semibold' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                Messages
+              </button>
+            </div>
+          </div>
           <div className="flex-grow">
             <ResponsiveContainer width="100%" height={320}>
               <AreaChart data={dailyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
@@ -331,6 +368,14 @@ export default function DashboardCharts({ dailyData, barData, campaignData }: Da
                   <linearGradient id="colorAccepted" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.3} />
                     <stop offset="95%" stopColor="#82ca9d" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorMessages" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="colorReplies" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <XAxis
@@ -346,40 +391,48 @@ export default function DashboardCharts({ dailyData, barData, campaignData }: Da
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '12px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}
                   itemStyle={{ fontSize: '11px' }}
                 />
-                <Area type="monotone" dataKey="invites" stroke="#8884d8" strokeWidth={3} fillOpacity={1} fill="url(#colorInvites)" name="Invites" />
-                <Area type="monotone" dataKey="accepted" stroke="#82ca9d" strokeWidth={3} fillOpacity={1} fill="url(#colorAccepted)" name="Accepted" />
+                {dailyTrendsType === 'invites' ? (
+                  <>
+                    <Area type="monotone" dataKey="invites" stroke="#8884d8" strokeWidth={3} fillOpacity={1} fill="url(#colorInvites)" name="Invites" />
+                    <Area type="monotone" dataKey="accepted" stroke="#82ca9d" strokeWidth={3} fillOpacity={1} fill="url(#colorAccepted)" name="Accepted" />
+                  </>
+                ) : (
+                  <>
+                    <Area type="monotone" dataKey="messages" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorMessages)" name="Messages" />
+                    <Area type="monotone" dataKey="replies" stroke="#f59e0b" strokeWidth={3} fillOpacity={1} fill="url(#colorReplies)" name="Replied" />
+                  </>
+                )}
               </AreaChart>
             </ResponsiveContainer>
           </div>
           <div className="mt-4 flex justify-center gap-6 border-t border-slate-700/30 pt-6">
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#8884d8]"></div>
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Invites</span>
+              <div className={`w-2.5 h-2.5 rounded-full ${dailyTrendsType === 'invites' ? 'bg-[#8884d8]' : 'bg-[#8b5cf6]'}`}></div>
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{dailyTrendsType === 'invites' ? 'Invites' : 'Messages'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#82ca9d]"></div>
-              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Accepted</span>
+              <div className={`w-2.5 h-2.5 rounded-full ${dailyTrendsType === 'invites' ? 'bg-[#82ca9d]' : 'bg-[#f59e0b]'}`}></div>
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">{dailyTrendsType === 'invites' ? 'Accepted' : 'Replied'}</span>
             </div>
           </div>
         </div>
 
         <PieGroup
-          title="Invites Conversion by Profile"
+          title={pieGroupType === 'invites' ? "Invites Conversion by Profile" : "Replies Analytics by Profile"}
           data={barData}
-          dataKeys={{ success: 'accepted', total: 'invites' }}
-          labels={{ success: 'Accepted', fail: 'No Response' }}
+          dataKeys={pieGroupType === 'invites' ? { success: 'accepted', total: 'invites' } : { success: 'replies', total: 'messages' }}
+          labels={pieGroupType === 'invites' ? { success: 'Accepted', fail: 'No Response' } : { success: 'Replied', fail: 'No Reply' }}
+          type={pieGroupType}
+          onTypeChange={setPieGroupType}
         />
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <PieGroup
-          title="Replies Analytics by Profile"
-          data={barData}
-          dataKeys={{ success: 'replies', total: 'messages' }}
-          labels={{ success: 'Replied', fail: 'No Reply' }}
-        />
-
         <CampaignCarouselChart data={campaignData} />
+        
+        <div className="bg-[#1e293b]/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 text-slate-100 flex flex-col h-full items-center justify-center border-dashed min-h-[420px]">
+          <p className="text-sm font-medium uppercase tracking-widest text-slate-500">Coming Soon</p>
+        </div>
       </div>
     </div>
   );
