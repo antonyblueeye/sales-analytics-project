@@ -91,10 +91,11 @@ def get_leads_list(
     
     # FETCH MESSAGES for these leads to populate the Correspondence drawer
     msg_query = text("""
-        SELECT lead_id, message, action_type, performed_at
-        FROM actions
-        WHERE lead_id IN :lead_ids AND message <> ''
-        ORDER BY performed_at ASC
+        SELECT a.lead_id, a.message, a.action_type, a.performed_at, p.name as profile_name
+        FROM actions a
+        LEFT JOIN profiles p ON a.profile_id = p.id
+        WHERE a.lead_id IN :lead_ids AND a.message <> ''
+        ORDER BY a.performed_at ASC
     """)
     msg_res = db.execute(msg_query, {"lead_ids": tuple(lead_ids)})
     
@@ -108,6 +109,7 @@ def get_leads_list(
         messages_by_lead[lid].append({
             "role": "lead" if r['action_type'] == 'replied' else "me",
             "text": r['message'],
+            "profile_name": r['profile_name'] or 'Unknown',
             "timestamp": r['performed_at'].strftime('%H:%M %d.%m.%Y') if r['performed_at'] else ''
         })
 
@@ -176,9 +178,11 @@ def get_replied_leads(db: Session, page: int = 1, limit: int = 20):
             m.profile_names,
             a.message,
             a.action_type,
-            a.performed_at
+            a.performed_at,
+            p.name as profile_name
         FROM leads l
         JOIN actions a ON l.id = a.lead_id
+        LEFT JOIN profiles p ON a.profile_id = p.id
         LEFT JOIN lead_metadata m ON l.id = m.lead_id
         WHERE l.id IN :lead_ids AND a.message <> ''
         ORDER BY a.performed_at ASC
@@ -213,6 +217,7 @@ def get_replied_leads(db: Session, page: int = 1, limit: int = 20):
         leads_dict[lid]["messages"].append({
             "role": "lead" if r['action_type'] == 'replied' else "me",
             "text": r['message'],
+            "profile_name": r['profile_name'] or 'Unknown',
             "timestamp": r['performed_at'].strftime('%H:%M %d.%m.%Y') if r['performed_at'] else ''
         })
     

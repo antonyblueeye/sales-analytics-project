@@ -3,12 +3,12 @@ import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'reac
 import { DayPicker, DateRange } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
 import 'react-day-picker/dist/style.css';
-import { 
-    Search, 
-    Filter, 
-    Mail, 
-    MessageCircle, 
-    MoreHorizontal, 
+import {
+    Search,
+    Filter,
+    Mail,
+    MessageCircle,
+    MoreHorizontal,
     MoreVertical,
     X,
     Send,
@@ -19,7 +19,8 @@ import {
     Handshake,
     UserCheck,
     Check,
-    Calendar as CalendarIcon
+    Calendar as CalendarIcon,
+    Star
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -38,8 +39,8 @@ interface Lead {
     email: string;
     linkedinUrl: string;
     hubspotUrl: string;
-    messages: { role: 'lead' | 'me', text: string, timestamp: string }[];
-    activities: { id: number, type: string, date: string }[];
+    messages: { role: 'lead' | 'me', text: string, timestamp: string, profile_name?: string }[];
+    activities: { id: number, type: string, date: string, campaign?: string, profile?: string }[];
     createdAt: string;
     lastActivityAt: string;
 }
@@ -51,9 +52,10 @@ interface DatePickerButtonProps {
     label?: string;
     className?: string;
     popoverDirection?: 'up' | 'down';
+    popoverAlignment?: 'left' | 'right';
 }
 
-const DatePickerButton = ({ date, onSelect, label, className, popoverDirection = 'down' }: DatePickerButtonProps) => {
+const DatePickerButton = ({ date, onSelect, label, className, popoverDirection = 'down', popoverAlignment = 'right' }: DatePickerButtonProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -68,7 +70,7 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
     return (
         <div className={`relative ${className}`} ref={ref}>
             <div className="relative group">
-                <button 
+                <button
                     onClick={() => setIsOpen(!isOpen)}
                     className="w-full flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 hover:border-slate-500 transition-all focus:ring-1 focus:ring-indigo-500 outline-none h-[30px] pr-8"
                 >
@@ -76,7 +78,7 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                     <span className="truncate">{date ? format(parseISO(date), 'MMM dd, yyyy') : (label || 'Select date')}</span>
                 </button>
                 {date && (
-                    <button 
+                    <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onSelect('');
@@ -89,12 +91,13 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
             </div>
 
             {isOpen && (
-                <div 
+                <div
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
+                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${popoverAlignment === 'right' ? 'right-0' : 'left-0'} z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
                 >
-                    <style dangerouslySetInnerHTML={{ __html: `
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
                         .rdp-root {
                             --rdp-accent-color: #6366f1;
                             --rdp-accent-background-color: rgba(99, 102, 241, 0.15);
@@ -119,7 +122,7 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                         }}
                     />
                     <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
-                        <button 
+                        <button
                             onClick={() => setIsOpen(false)}
                             className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                         >
@@ -138,9 +141,10 @@ interface DateRangePickerButtonProps {
     label?: string;
     className?: string;
     popoverDirection?: 'up' | 'down';
+    popoverAlignment?: 'left' | 'right';
 }
 
-const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirection = 'down' }: DateRangePickerButtonProps) => {
+const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirection = 'down', popoverAlignment = 'right' }: DateRangePickerButtonProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -161,7 +165,7 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
     return (
         <div className={`relative ${className}`} ref={ref}>
             <div className="relative group">
-                <button 
+                <button
                     onClick={() => setIsOpen(!isOpen)}
                     className="w-full flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 hover:border-slate-500 transition-all focus:ring-1 focus:ring-indigo-500 outline-none h-[30px] pr-8"
                 >
@@ -169,7 +173,7 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
                     <span className="truncate">{displayText()}</span>
                 </button>
                 {range?.from && (
-                    <button 
+                    <button
                         onClick={(e) => {
                             e.stopPropagation();
                             onSelect(undefined);
@@ -182,12 +186,13 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
             </div>
 
             {isOpen && (
-                <div 
+                <div
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} right-0 z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
+                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${popoverAlignment === 'right' ? 'right-0' : 'left-0'} z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
                 >
-                    <style dangerouslySetInnerHTML={{ __html: `
+                    <style dangerouslySetInnerHTML={{
+                        __html: `
                         .rdp-root {
                             --rdp-accent-color: #6366f1;
                             --rdp-accent-background-color: rgba(99, 102, 241, 0.15);
@@ -208,7 +213,7 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
                         onSelect={onSelect}
                     />
                     <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
-                        <button 
+                        <button
                             onClick={() => setIsOpen(false)}
                             className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                         >
@@ -233,7 +238,7 @@ export default function CRMPage() {
     const [totalLeads, setTotalLeads] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
     const [isLoading, setIsLoading] = useState(false);
-    
+
     // ... rest of the original states ...
     const [search, setSearch] = useState('');
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
@@ -242,7 +247,7 @@ export default function CRMPage() {
     const [drawerWidth, setDrawerWidth] = useState(500);
     const [isResizing, setIsResizing] = useState(false);
     const [showFilters, setShowFilters] = useState(false);
-    const [selectedActivity, setSelectedActivity] = useState<string>('call');
+    const [selectedActivity, setSelectedActivity] = useState<string>('interested');
     const [activityDate, setActivityDate] = useState(new Date().toISOString().split('T')[0]);
     const [activeTab, setActiveTab] = useState<'all' | 'replied'>('all');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null);
@@ -258,12 +263,15 @@ export default function CRMPage() {
     const [filterLastName, setFilterLastName] = useState('');
     const [filterCreateDate, setFilterCreateDate] = useState<DateRange | undefined>(undefined);
     const [filterActivityDate, setFilterActivityDate] = useState<DateRange | undefined>(undefined);
+    const [messageProfileFilter, setMessageProfileFilter] = useState<string>('');
+    const [selectedCampaign, setSelectedCampaign] = useState<string>('');
+    const [selectedActivityProfile, setSelectedActivityProfile] = useState<string>('');
 
     const fetchLeads = async (page: number, currentFilters: any = {}) => {
         setIsLoading(true);
         try {
-            const endpoint = activeTab === 'all' 
-                ? 'http://localhost:8000/crm/leads' 
+            const endpoint = activeTab === 'all'
+                ? 'http://localhost:8000/crm/leads'
                 : 'http://localhost:8000/crm/replied-leads';
 
             // Build query params
@@ -271,7 +279,7 @@ export default function CRMPage() {
                 page: page.toString(),
                 limit: '20'
             });
-            
+
             if (activeTab === 'all') {
                 if (currentFilters.search) params.append('search', currentFilters.search);
                 if (currentFilters.firstName) params.append('first_name', currentFilters.firstName);
@@ -296,7 +304,7 @@ export default function CRMPage() {
                 profileNames: l.profile_names || '',
                 email: l.email,
                 linkedinUrl: l.linkedin_url,
-                hubspotUrl: '', 
+                hubspotUrl: '',
                 messages: l.messages || [],
                 activities: [],
                 createdAt: l.last_reply_at || '2026-04-15',
@@ -329,7 +337,7 @@ export default function CRMPage() {
     // Debounce effect for filters
     useEffect(() => {
         if (activeTab !== 'all') return; // Only 'all' tab uses live filters for now
-        
+
         const handler = setTimeout(() => {
             setCurrentPage(1); // Reset to first page on filter change
             fetchLeads(1, {
@@ -364,10 +372,22 @@ export default function CRMPage() {
 
     const handleSaveActivity = () => {
         if (!activeLead) return;
+        if (!selectedCampaign) {
+            alert('Please select a campaign first');
+            return;
+        }
+        
+        if (!selectedActivityProfile) {
+            alert('Please select a profile first');
+            return;
+        }
+        
         const newActivity = {
             id: Date.now(),
             type: selectedActivity,
-            date: activityDate
+            date: activityDate,
+            campaign: selectedCampaign,
+            profile: selectedActivityProfile
         };
         const updatedLead = {
             ...activeLead,
@@ -389,6 +409,7 @@ export default function CRMPage() {
     };
 
     const activityTypes = [
+        { value: 'interested', label: 'Interested', icon: Star },
         { value: 'call', label: 'Call', icon: Phone },
         { value: 'mql', label: 'MQL', icon: Mail },
         { value: 'sql', label: 'SQL', icon: Briefcase },
@@ -403,6 +424,30 @@ export default function CRMPage() {
         } else {
             setActiveLead(lead);
             setSelectedLead(lead);
+            
+            // Set default profile filter to the first profile that has messages
+            const profilesWithMessages = Array.from(new Set(lead.messages?.map(m => m.profile_name))).filter(Boolean);
+            if (profilesWithMessages.length > 0) {
+                setMessageProfileFilter(profilesWithMessages[0]!);
+            } else {
+                setMessageProfileFilter('');
+            }
+            
+            // Set default campaign
+            const campaigns = lead.campaignNames ? lead.campaignNames.split(', ').filter(Boolean) : [];
+            if (campaigns.length > 0) {
+                setSelectedCampaign(campaigns[0]);
+            } else {
+                setSelectedCampaign('');
+            }
+
+            const profiles = lead.profileNames ? lead.profileNames.split(', ').filter(Boolean) : [];
+            if (profiles.length > 0) {
+                setSelectedActivityProfile(profiles[0]);
+            } else {
+                setSelectedActivityProfile('');
+            }
+
             setTimeout(() => setIsDrawerOpen(true), 10);
         }
     };
@@ -412,6 +457,9 @@ export default function CRMPage() {
         setTimeout(() => {
             setSelectedLead(null);
             setActiveLead(null);
+            setMessageProfileFilter('');
+            setSelectedCampaign('');
+            setSelectedActivityProfile('');
         }, 300);
     };
 
@@ -447,8 +495,8 @@ export default function CRMPage() {
     const filteredLeads = leads;
 
     const activeFiltersCount = [
-        filterCampaign, filterStatus, filterPosition, filterCompany, 
-        filterLocation, filterFirstName, filterLastName, 
+        filterCampaign, filterStatus, filterPosition, filterCompany,
+        filterLocation, filterFirstName, filterLastName,
         filterCreateDate, filterActivityDate
     ].filter(f => f && f !== '').length;
 
@@ -472,13 +520,13 @@ export default function CRMPage() {
                     <div className="flex flex-col gap-1">
                         <h1 className="text-2xl font-bold tracking-tight text-white">CRM</h1>
                         <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-xl w-fit border border-slate-700/50 mt-1">
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('all')}
                                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
                             >
                                 All Leads
                             </button>
-                            <button 
+                            <button
                                 onClick={() => setActiveTab('replied')}
                                 className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'replied' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
                             >
@@ -497,7 +545,7 @@ export default function CRMPage() {
                                 className="pl-10 pr-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64 text-sm"
                             />
                         </div>
-                        <button 
+                        <button
                             onClick={() => setShowFilters(!showFilters)}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors text-sm relative ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'}`}
                         >
@@ -510,7 +558,7 @@ export default function CRMPage() {
                             )}
                         </button>
                         {activeFiltersCount > 0 && (
-                            <button 
+                            <button
                                 onClick={clearAllFilters}
                                 className="flex items-center gap-2 px-3 py-2 text-slate-500 hover:text-rose-400 transition-colors text-sm font-medium"
                             >
@@ -525,9 +573,9 @@ export default function CRMPage() {
                     <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3 p-4 bg-slate-800/50 border border-slate-700 rounded-xl animate-in fade-in slide-in-from-top-2">
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">First Name</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterFirstName}
                                 onChange={(e) => setFilterFirstName(e.target.value)}
@@ -535,9 +583,9 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Last Name</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterLastName}
                                 onChange={(e) => setFilterLastName(e.target.value)}
@@ -545,9 +593,9 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Campaign</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterCampaign}
                                 onChange={(e) => setFilterCampaign(e.target.value)}
@@ -555,9 +603,9 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Status</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value)}
@@ -565,9 +613,9 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Position</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterPosition}
                                 onChange={(e) => setFilterPosition(e.target.value)}
@@ -575,9 +623,9 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Company</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterCompany}
                                 onChange={(e) => setFilterCompany(e.target.value)}
@@ -585,9 +633,9 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Location</label>
-                            <input 
-                                type="text" 
-                                placeholder="Filter..." 
+                            <input
+                                type="text"
+                                placeholder="Filter..."
                                 className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
                                 value={filterLocation}
                                 onChange={(e) => setFilterLocation(e.target.value)}
@@ -595,7 +643,7 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Created At</label>
-                            <DateRangePickerButton 
+                            <DateRangePickerButton
                                 range={filterCreateDate}
                                 onSelect={setFilterCreateDate}
                                 label="All time"
@@ -603,7 +651,7 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Last Activity</label>
-                            <DateRangePickerButton 
+                            <DateRangePickerButton
                                 range={filterActivityDate}
                                 onSelect={setFilterActivityDate}
                                 label="All time"
@@ -631,8 +679,8 @@ export default function CRMPage() {
                     </thead>
                     <tbody className="divide-y divide-slate-700/50">
                         {filteredLeads.map((lead) => (
-                            <tr 
-                                key={lead.id} 
+                            <tr
+                                key={lead.id}
                                 onClick={() => handleLeadClick(lead)}
                                 className={`group hover:bg-slate-700/30 cursor-pointer transition-colors ${selectedLead?.id === lead.id ? 'bg-indigo-600/10 border-indigo-500/30' : ''}`}
                             >
@@ -677,26 +725,26 @@ export default function CRMPage() {
                         ))}
                     </tbody>
                 </table>
-                
+
                 {/* Simple Pagination */}
                 <div className="sticky bottom-0 bg-slate-900/90 backdrop-blur-md border-t border-slate-700/50 p-4 flex items-center justify-between z-10">
                     <div className="text-xs text-slate-400">
                         Showing <span className="text-white font-bold">{(currentPage - 1) * 20 + 1}</span> to <span className="text-white font-bold">{Math.min(currentPage * 20, totalLeads)}</span> of <span className="text-white font-bold">{totalLeads}</span> leads
                     </div>
                     <div className="flex items-center gap-1">
-                        <button 
+                        <button
                             disabled={currentPage === 1}
                             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                             className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
                         >
                             Previous
                         </button>
-                        
+
                         <div className="flex items-center gap-1 mx-2">
                             {(() => {
                                 const totalPages = Math.ceil(totalLeads / 20);
                                 const pages = [];
-                                const delta = 1; 
+                                const delta = 1;
 
                                 for (let i = 1; i <= totalPages; i++) {
                                     if (i === 1 || i === totalPages || (i >= currentPage - delta && i <= currentPage + delta)) {
@@ -705,19 +753,18 @@ export default function CRMPage() {
                                         pages.push('...');
                                     }
                                 }
-                                
-                                return pages.filter((v, i, a) => v !== '...' || a[i-1] !== '...').map((p, idx) => (
+
+                                return pages.filter((v, i, a) => v !== '...' || a[i - 1] !== '...').map((p, idx) => (
                                     p === '...' ? (
                                         <span key={`dots-${idx}`} className="text-slate-600 px-1">...</span>
                                     ) : (
                                         <button
                                             key={p}
                                             onClick={() => setCurrentPage(Number(p))}
-                                            className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition-all active:scale-90 ${
-                                                currentPage === p 
-                                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                                            className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs font-medium transition-all active:scale-90 ${currentPage === p
+                                                ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                                                 : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200 border border-transparent hover:border-slate-700'
-                                            }`}
+                                                }`}
                                         >
                                             {p}
                                         </button>
@@ -726,7 +773,7 @@ export default function CRMPage() {
                             })()}
                         </div>
 
-                        <button 
+                        <button
                             disabled={currentPage * 20 >= totalLeads}
                             onClick={() => setCurrentPage(p => p + 1)}
                             className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all active:scale-95"
@@ -741,20 +788,20 @@ export default function CRMPage() {
             {selectedLead && (
                 <>
                     {/* Backdrop / Overlay */}
-                    <div 
+                    <div
                         className={`fixed inset-0 bg-black/40 backdrop-blur-[2px] z-[90] transition-opacity duration-300 ${isDrawerOpen ? 'opacity-100' : 'opacity-0'}`}
                         onClick={handleCloseDrawer}
                     />
 
-                    <div 
+                    <div
                         className={`fixed top-0 right-0 h-full bg-slate-900 border-l border-slate-700 shadow-2xl z-[100] flex transition-transform duration-300 ease-out`}
-                        style={{ 
+                        style={{
                             width: `${drawerWidth}px`,
                             transform: isDrawerOpen ? 'translateX(0)' : 'translateX(100%)'
                         }}
                     >
                         {/* Resize Handle */}
-                        <div 
+                        <div
                             className="w-1 h-full cursor-ew-resize hover:bg-indigo-500 transition-colors absolute left-0"
                             onMouseDown={startResizing}
                         >
@@ -784,7 +831,7 @@ export default function CRMPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <button 
+                                <button
                                     onClick={handleCloseDrawer}
                                     className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
                                 >
@@ -799,9 +846,9 @@ export default function CRMPage() {
                                     <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Contact Information</h3>
                                     <div className="grid grid-cols-2 gap-3">
                                         {activeLead?.linkedinUrl && (
-                                            <a 
-                                                href={activeLead?.linkedinUrl} 
-                                                target="_blank" 
+                                            <a
+                                                href={activeLead?.linkedinUrl}
+                                                target="_blank"
                                                 className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-[#0077b5]/50 hover:bg-slate-800 transition-all group"
                                             >
                                                 <div className="p-2 bg-[#0077b5]/10 rounded-lg group-hover:bg-[#0077b5] transition-colors">
@@ -815,9 +862,9 @@ export default function CRMPage() {
                                             </a>
                                         )}
                                         {activeLead?.hubspotUrl && (
-                                            <a 
-                                                href={activeLead?.hubspotUrl} 
-                                                target="_blank" 
+                                            <a
+                                                href={activeLead?.hubspotUrl}
+                                                target="_blank"
                                                 className="flex items-center gap-3 p-3 bg-slate-800/50 border border-slate-700 rounded-xl hover:border-orange-500/50 hover:bg-slate-800 transition-all group"
                                             >
                                                 <div className="p-2 bg-orange-600/20 text-orange-500 rounded-lg group-hover:bg-orange-600 group-hover:text-white transition-colors">
@@ -843,7 +890,7 @@ export default function CRMPage() {
                                         )}
                                     </div>
                                 </section>
-                                
+
                                 {/* Campaigns & Profiles */}
                                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     {(activeLead?.campaignNames && activeLead.campaignNames.trim() !== '') && (
@@ -871,13 +918,13 @@ export default function CRMPage() {
                                                 {activeLead.profileNames.split(', ').map((name, i) => (
                                                     <div key={i} className="flex items-center gap-2.5 p-1.5 pr-3 bg-slate-800/40 border border-slate-700/50 rounded-2xl group/profile hover:bg-slate-800 transition-all">
                                                         <div className="relative">
-                                                            <img 
-                                                                src={`/${name}.jpg`} 
+                                                            <img
+                                                                src={`/${name}.jpg`}
                                                                 onError={(e) => {
                                                                     (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&bold=true`;
                                                                 }}
-                                                                className="w-7 h-7 rounded-full object-cover border border-slate-600 ring-2 ring-transparent group-hover/profile:ring-indigo-500/50 transition-all shadow-md" 
-                                                                alt={name} 
+                                                                className="w-7 h-7 rounded-full object-cover border border-slate-600 ring-2 ring-transparent group-hover/profile:ring-indigo-500/50 transition-all shadow-md"
+                                                                alt={name}
                                                             />
                                                             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-sm" />
                                                         </div>
@@ -893,36 +940,86 @@ export default function CRMPage() {
                                 <section>
                                     <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Log Activity</h3>
                                     <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 space-y-4">
-                                        <div className="grid grid-cols-5 gap-2">
+                                        <div className="flex flex-col gap-4">
+                                            {/* Profile Selector */}
+                                            <div className="flex flex-col gap-2">
+                                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Select Profile</label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {activeLead?.profileNames ? activeLead.profileNames.split(', ').filter(Boolean).map(pName => (
+                                                        <button 
+                                                            key={pName}
+                                                            onClick={() => setSelectedActivityProfile(pName)}
+                                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                                                                selectedActivityProfile === pName 
+                                                                ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-lg shadow-indigo-600/10' 
+                                                                : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'
+                                                            }`}
+                                                        >
+                                                            {pName}
+                                                        </button>
+                                                    )) : (
+                                                        <div className="text-[10px] text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
+                                                            No associated profiles found
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Campaign Selector */}
+                                        <div className="flex flex-col gap-2">
+                                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Select Campaign</label>
+                                            <div className="flex flex-wrap gap-2">
+                                                {activeLead?.campaignNames ? activeLead.campaignNames.split(', ').filter(Boolean).map(cName => (
+                                                    <button 
+                                                        key={cName}
+                                                        onClick={() => setSelectedCampaign(cName)}
+                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${
+                                                            selectedCampaign === cName 
+                                                            ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-lg shadow-indigo-600/10' 
+                                                            : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'
+                                                        }`}
+                                                    >
+                                                        {cName}
+                                                    </button>
+                                                )) : (
+                                                    <div className="text-[10px] text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
+                                                        No associated campaigns found
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                                             {activityTypes.map((type) => (
                                                 <button
                                                     key={type.value}
                                                     onClick={() => setSelectedActivity(type.value)}
                                                     title={type.label}
-                                                    className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all ${
-                                                        selectedActivity === type.value 
-                                                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20' 
+                                                    className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all ${selectedActivity === type.value
+                                                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
                                                         : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                                                    }`}
+                                                        }`}
                                                 >
                                                     <type.icon size={18} />
-                                                    <span className="text-[10px] font-medium uppercase">{type.label}</span>
+                                                    <span className="text-[8.5px] font-bold uppercase tracking-tighter">{type.label}</span>
                                                 </button>
                                             ))}
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            <DatePickerButton 
+                                            <DatePickerButton
                                                 date={activityDate}
                                                 onSelect={setActivityDate}
                                                 popoverDirection="up"
+                                                popoverAlignment="left"
                                                 className="flex-1"
                                             />
-                                            <button 
+                                            <button
                                                 onClick={handleSaveActivity}
                                                 className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95 whitespace-nowrap"
                                             >
                                                 Save Activity
                                             </button>
+                                        </div>
                                         </div>
                                     </div>
                                 </section>
@@ -940,12 +1037,22 @@ export default function CRMPage() {
                                                             <div className="p-2 bg-slate-900 border border-slate-700 rounded-lg text-indigo-400">
                                                                 <typeInfo.icon size={14} />
                                                             </div>
-                                                            <div>
-                                                                <div className="text-sm font-medium text-slate-200 capitalize">{activity.type}</div>
+                                                            <div className="flex-1">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="text-sm font-medium text-slate-200 capitalize">{activity.type}</div>
+                                                                    <div className="w-1 h-1 rounded-full bg-slate-600" />
+                                                                    <div className="text-[10px] text-indigo-400 font-bold">{activity.campaign}</div>
+                                                                    {activity.profile && (
+                                                                        <>
+                                                                            <div className="w-1 h-1 rounded-full bg-slate-600" />
+                                                                            <div className="text-[10px] text-slate-500 font-medium italic">by {activity.profile}</div>
+                                                                        </>
+                                                                    )}
+                                                                </div>
                                                                 <div className="text-[10px] text-slate-500">{format(parseISO(activity.date), 'MMM dd, yyyy')}</div>
                                                             </div>
                                                         </div>
-                                                        <button 
+                                                        <button
                                                             onClick={() => handleDeleteActivity(activity.id)}
                                                             className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-rose-500/20 hover:text-rose-500 rounded-lg text-slate-500 transition-all"
                                                         >
@@ -964,13 +1071,43 @@ export default function CRMPage() {
 
                                 {/* Conversation */}
                                 <section className="flex flex-col h-[400px]">
-                                    <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Correspondence</h3>
+                                    <div className="flex flex-col gap-3 mb-4">
+                                        <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider">Correspondence</h3>
+                                        
+                                        {/* Profile Toggle */}
+                                        {activeLead?.messages && activeLead.messages.length > 0 && (
+                                            <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-xl w-fit border border-slate-700/50">
+                                                {Array.from(new Set(activeLead.messages.map(m => m.profile_name))).filter(Boolean).map(pName => (
+                                                    <button 
+                                                        key={pName}
+                                                        onClick={() => setMessageProfileFilter(pName!)}
+                                                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all uppercase whitespace-nowrap shadow-sm ${messageProfileFilter === pName ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
+                                                    >
+                                                        {pName}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="flex-1 bg-slate-800/50 border border-slate-700 rounded-2xl flex flex-col p-4 overflow-hidden">
                                         <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
-                                            {activeLead?.messages && activeLead.messages.length > 0 ? (
-                                                activeLead.messages.map((msg, i) => {
+                                            {(() => {
+                                                const filteredMessages = (activeLead?.messages || []).filter(msg => 
+                                                    messageProfileFilter === '' || msg.profile_name === messageProfileFilter
+                                                );
+
+                                                if (filteredMessages.length === 0) {
+                                                    return (
+                                                        <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2 opacity-50">
+                                                            <MessageCircle size={32} />
+                                                            <p className="text-sm">No messages {messageProfileFilter ? `from ${messageProfileFilter}` : ''}</p>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return filteredMessages.map((msg, i) => {
                                                     const messageDate = msg.timestamp.split(' ')[1];
-                                                    const prevMessageDate = i > 0 ? activeLead.messages[i-1].timestamp.split(' ')[1] : null;
+                                                    const prevMessageDate = i > 0 ? filteredMessages[i - 1].timestamp.split(' ')[1] : null;
                                                     const showDateHeader = messageDate !== prevMessageDate;
                                                     const messageTime = msg.timestamp.split(' ')[0];
 
@@ -986,11 +1123,10 @@ export default function CRMPage() {
                                                                 </div>
                                                             )}
                                                             <div className={`flex ${msg.role === 'lead' ? 'justify-end' : 'justify-start'}`}>
-                                                                <div className={`max-w-[80%] p-3 rounded-2xl text-sm relative group/msg ${
-                                                                    msg.role === 'lead' 
-                                                                    ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-600/20' 
+                                                                <div className={`max-w-[80%] p-3 rounded-2xl text-sm relative group/msg break-words whitespace-pre-wrap ${msg.role === 'lead'
+                                                                    ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-600/20'
                                                                     : 'bg-slate-700/80 text-slate-100 rounded-tl-none border border-slate-600/50'
-                                                                }`}>
+                                                                    }`}>
                                                                     {msg.text}
                                                                     <div className={`text-[9px] mt-1.5 text-right opacity-70 ${msg.role === 'lead' ? 'text-indigo-100' : 'text-slate-400'}`}>
                                                                         {messageTime}
@@ -999,13 +1135,8 @@ export default function CRMPage() {
                                                             </div>
                                                         </div>
                                                     );
-                                                })
-                                            ) : (
-                                                <div className="h-full flex flex-col items-center justify-center text-slate-500 gap-2 opacity-50">
-                                                    <MessageCircle size={32} />
-                                                    <p className="text-sm">No messages yet</p>
-                                                </div>
-                                            )}
+                                                });
+                                            })()}
                                         </div>
                                     </div>
                                 </section>
@@ -1021,7 +1152,7 @@ export default function CRMPage() {
                     <div className="relative overflow-hidden bg-slate-900/90 backdrop-blur-2xl border border-indigo-500/40 rounded-3xl p-5 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.7),0_0_20px_rgba(99,102,241,0.2)] flex items-center gap-5 min-w-[380px]">
                         {/* Shimmer effect */}
                         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-400/10 to-transparent -translate-x-full animate-shimmer" />
-                        
+
                         <div className="relative">
                             <div className="w-14 h-14 bg-indigo-500/20 rounded-2xl flex items-center justify-center text-indigo-400 border border-indigo-500/30 shadow-inner group">
                                 <Check size={28} strokeWidth={2.5} className="drop-shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
@@ -1030,7 +1161,7 @@ export default function CRMPage() {
                                 <div className="w-1.5 h-1.5 bg-white rounded-full" />
                             </div>
                         </div>
-                        
+
                         <div className="flex-1">
                             <div className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
                                 Success
@@ -1040,7 +1171,7 @@ export default function CRMPage() {
                             <div className="text-xs text-slate-400 font-medium">{toast.message}</div>
                         </div>
 
-                        <button 
+                        <button
                             onClick={() => setToast(null)}
                             className="p-2.5 hover:bg-slate-800/80 rounded-xl text-slate-500 hover:text-white transition-all active:scale-90 hover:rotate-90 duration-300"
                         >

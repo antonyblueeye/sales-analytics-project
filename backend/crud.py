@@ -49,6 +49,19 @@ def upsert_lead(db: Session, external_id: str = None, object_urn: str = None, **
     if not lead and object_urn:
         lead = db.query(Lead).filter(Lead.object_urn == object_urn).first()
     
+    # Дополнительные критерии: LinkedIn URL и Email
+    if not lead and kwargs.get('linkedin_url'):
+        lead = db.query(Lead).filter(Lead.linkedin_url == kwargs.get('linkedin_url')).first()
+    
+    if not lead and kwargs.get('email'):
+        lead = db.query(Lead).filter(Lead.email == kwargs.get('email')).first()
+    
+    if not lead and kwargs.get('first_name') and kwargs.get('last_name'):
+        # Рискованно, но как совсем последний шанс (можно закомментировать если слишком агрессивно)
+        lead = db.query(Lead).filter(
+            Lead.first_name == kwargs.get('first_name'),
+            Lead.last_name == kwargs.get('last_name')
+        ).first()
     if lead:
         # Обновляем только переданные поля (кроме служебных)
         for key, value in kwargs.items():
