@@ -1,3 +1,8 @@
+import sys
+import os
+# Добавляем текущую директорию в путь поиска модулей, чтобы импорты из этого же фолдера работали корректно
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from models import Action, Lead
@@ -203,4 +208,46 @@ def get_daily_summary(db: Session, from_date: date, to_date: date):
             "replies": row.replies
         }
         for row in result
-    ]
+    ]
+
+def get_recent_replies(db: Session, from_date: date, to_date: date):
+    """
+    Returns a list of recent replies with lead info (name, photo, message text).
+    """
+    from datetime import timedelta
+    import re
+    from models import Campaign, Profile, Action, Lead
+    next_day = to_date + timedelta(days=1)
+    
+    from sqlalchemy import func
+    # Запрос через ORM: берем Action как основу и цепляем связанные таблицы
+    results = db.query(Action, Lead, Campaign, Profile)\
+        .join(Lead, Action.lead_id == Lead.id)\
+        .outerjoin(Campaign, Action.campaign_id == Campaign.id)\
+        .outerjoin(Profile, Action.profile_id == Profile.id)\
+        .filter(Action.action_type == 'replied')\
+        .filter(func.date(Action.performed_at) >= from_date)\
+        .filter(func.date(Action.performed_at) <= to_date)\
+        .order_by(Action.performed_at.desc())\
+        .limit(200).all()\
+    
+    def clean_name(name):
+        if not name: return "N/A"
+        # Убираем любые скобки [квадратные] и (круглые) и текст внутри них
+        cleaned = re.sub(r'\s*[\[\(].*?[\]\)]', '', name)
+        return cleaned.strip() or name
+
+    return [
+        {
+            "first_name": row.Lead.first_name,
+            "last_name": row.Lead.last_name,
+            "photo_url": row.Lead.photo_url,
+            "linkedin_url": row.Lead.linkedin_url,
+            "message": row.Action.message or "",
+            "performed_at": row.Action.performed_at.isoformat(),
+            "campaign_name": clean_name(row.Campaign.name if row.Campaign else None),
+            "profile_name": (row.Profile.name if row.Profile else "Unknown")
+        }
+        for row in results
+    ]
+

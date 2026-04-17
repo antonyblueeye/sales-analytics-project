@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from models import Action, Lead
@@ -13,7 +17,11 @@ def get_leads_list(
     last_name: str = None,
     company: str = None,
     location: str = None,
-    title: str = None
+    title: str = None,
+    create_date_from: str = None,
+    create_date_to: str = None,
+    activity_date_from: str = None,
+    activity_date_to: str = None
 ):
     offset = (page - 1) * limit
     
@@ -39,6 +47,24 @@ def get_leads_list(
     if title:
         where_clauses.append("current_title ILIKE :ttl")
         params["ttl"] = f"%{title}%"
+
+    if create_date_from:
+        where_clauses.append("created_at >= :c_from")
+        params["c_from"] = create_date_from
+    if create_date_to:
+        where_clauses.append("created_at <= :c_to")
+        params["c_to"] = create_date_to
+        
+    if activity_date_from:
+        # For general leads, activity_date might mean 'any action performed at'
+        # This requires a JOIN or a subquery. For now, let's just filter leads by their creation date
+        # if we don't want to join actions for the entire 'All leads' list yet.
+        # But if accuracy is needed:
+        where_clauses.append("EXISTS (SELECT 1 FROM actions a WHERE a.lead_id = leads.id AND a.performed_at >= :a_from)")
+        params["a_from"] = activity_date_from
+    if activity_date_to:
+        where_clauses.append("EXISTS (SELECT 1 FROM actions a WHERE a.lead_id = leads.id AND a.performed_at <= :a_to)")
+        params["a_to"] = activity_date_to
         
     where_sql = ""
     if where_clauses:
@@ -124,27 +150,85 @@ def get_leads_list(
         "limit": limit
     }
 
-def get_replied_leads(db: Session, page: int = 1, limit: int = 20):
+def get_replied_leads(
+    db: Session, 
+    page: int = 1, 
+    limit: int = 20,
+    search: str = None,
+    first_name: str = None,
+    last_name: str = None,
+    company: str = None,
+    location: str = None,
+    title: str = None,
+    create_date_from: str = None,
+    create_date_to: str = None,
+    activity_date_from: str = None,
+    activity_date_to: str = None
+):
     offset = (page - 1) * limit
     
-    # Get total count of UNIQUE leads who replied
-    total_count_query = text("""
-        SELECT count(DISTINCT lead_id) 
-        FROM actions 
-        WHERE action_type = 'replied'
+    where_clauses = ["a.action_type = 'replied'"]
+    params = {"offset": offset, "limit": limit}
+    
+    # ... previous filters ...
+    if search:
+        where_clauses.append("(l.first_name ILIKE :search OR l.last_name ILIKE :search OR l.current_employer ILIKE :search)")
+        params["search"] = f"%{search}%"
+    
+    if first_name:
+        where_clauses.append("l.first_name ILIKE :fn")
+        params["fn"] = f"%{first_name}%"
+    if last_name:
+        where_clauses.append("l.last_name ILIKE :ln")
+        params["ln"] = f"%{last_name}%"
+    if company:
+        where_clauses.append("l.current_employer ILIKE :comp")
+        params["comp"] = f"%{company}%"
+    if location:
+        where_clauses.append("l.location ILIKE :loc")
+        params["loc"] = f"%{location}%"
+    if title:
+        where_clauses.append("l.current_title ILIKE :ttl")
+        params["ttl"] = f"%{title}%"
+
+    if create_date_from:
+        where_clauses.append("l.created_at >= :c_from")
+        params["c_from"] = create_date_from
+    if create_date_to:
+        where_clauses.append("l.created_at <= :c_to")
+        params["c_to"] = create_date_to
+        
+    if activity_date_from:
+        # activity_date logic for Replied leads might need adjustment but 
+        # let's assume it means 'last reply performed at' or similar
+        where_clauses.append("a.performed_at >= :a_from")
+        params["a_from"] = activity_date_from
+    if activity_date_to:
+        where_clauses.append("a.performed_at <= :a_to")
+        params["a_to"] = activity_date_to
+        
+    where_sql = "WHERE " + " AND ".join(where_clauses)
+    
+    # Get total count of UNIQUE leads who replied with filters
+    total_count_query = text(f"""
+        SELECT count(DISTINCT a.lead_id) 
+        FROM actions a
+        JOIN leads l ON a.lead_id = l.id
+        {where_sql}
     """)
-    total_count = db.execute(total_count_query).scalar()
+    total_count = db.execute(total_count_query, params).scalar()
     
     # Get lead IDs for the current page, sorted by latest reply
-    lead_ids_query = text("""
-        SELECT lead_id, MAX(performed_at) as last_reply_at
-        FROM actions
-        WHERE action_type = 'replied'
-        GROUP BY lead_id
+    lead_ids_query = text(f"""
+        SELECT a.lead_id, MAX(a.performed_at) as last_reply_at
+        FROM actions a
+        JOIN leads l ON a.lead_id = l.id
+        {where_sql}
+        GROUP BY a.lead_id
         ORDER BY last_reply_at DESC
         OFFSET :offset LIMIT :limit
     """)
-    lead_ids_res = db.execute(lead_ids_query, {"offset": offset, "limit": limit})
+    lead_ids_res = db.execute(lead_ids_query, params)
     lead_data_list = [row._mapping for row in lead_ids_res]
     
     if not lead_data_list:

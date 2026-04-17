@@ -113,6 +113,7 @@ export default function Dashboard() {
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set());
   const [sortConfig, setSortConfig] = useState<{ key: ProfileKeys, direction: 'asc' | 'desc' } | null>(null);
   const [dailyData, setDailyData] = useState<any[]>([]);
+  const [recentReplies, setRecentReplies] = useState<any[]>([]);
 
   // Функция для запроса данных из Python бэкенда
   const fetchProfiles = useCallback(async () => {
@@ -124,7 +125,7 @@ export default function Dashboard() {
       const prevEnd = subDays(startDate, 1);
 
       // Запускаем все запросы параллельно: профили и кампании (текущие и прошлые)
-      const [currRes, prevRes, currCampRes, prevCampRes, dailyRes] = await Promise.all([
+      const [currRes, prevRes, currCampRes, prevCampRes, dailyRes, recentRepliesRes] = await Promise.all([
         axios.get('http://localhost:8000/analytics/profiles-summary', {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         }),
@@ -138,6 +139,9 @@ export default function Dashboard() {
           params: { from_date: format(prevStart, 'yyyy-MM-dd'), to_date: format(prevEnd, 'yyyy-MM-dd') }
         }),
         axios.get('http://localhost:8000/analytics/daily-summary', {
+          params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
+        }),
+        axios.get('http://localhost:8000/analytics/recent-replies', {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         })
       ]);
@@ -189,6 +193,7 @@ export default function Dashboard() {
       setProfiles(currRes.data.map((item: any) => mapItem(item, currCamps)));
       setPrevProfiles(prevRes.data.map((item: any) => mapItem(item, prevCamps)));
       setDailyData(dailyRes.data);
+      setRecentReplies(recentRepliesRes.data);
     } catch (error) {
       console.error('Error fetching analytics:', error);
     } finally {
@@ -473,7 +478,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <DashboardCharts dailyData={dailyData} barData={barData} campaignData={campaignData} />
+      <DashboardCharts dailyData={dailyData} barData={barData} campaignData={campaignData} recentReplies={recentReplies} />
       <CampaignHistorySection />
     </div>
   );

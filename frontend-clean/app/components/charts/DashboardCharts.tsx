@@ -4,13 +4,14 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, BarChart, Bar
 } from 'recharts';
-import { ChevronLeft, ChevronRight, LayoutPanelTop, Target, Play, Pause } from 'lucide-react';
+import { ChevronLeft, ChevronRight, LayoutPanelTop, Target, Play, Pause, ExternalLink, MessageSquare, User, Briefcase } from 'lucide-react';
 import CustomSelect from '../CustomSelect';
 
 interface DashboardChartsProps {
   dailyData: any[];
   barData: any[];
   campaignData: any[];
+  recentReplies: any[];
 }
 
 const COLORS = ['#82ca9d', '#ef4444']; // Green for success, Red for "pending/no response"
@@ -332,7 +333,189 @@ const CampaignCarouselChart = ({ data }: { data: any[] }) => {
   );
 };
 
-export default function DashboardCharts({ dailyData, barData, campaignData }: DashboardChartsProps) {
+const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
+  const [bubbles, setBubbles] = useState<any[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [timerKey, setTimerKey] = useState(0);
+  useEffect(() => {
+    if (!replies || replies.length === 0) {
+      setBubbles([]);
+      return;
+    }
+
+    const processedBubbles = replies.slice(0, 200).map((reply, i) => ({
+      ...reply,
+      id: i,
+    }));
+    setBubbles(processedBubbles);
+    setSelectedIndex(0);
+  }, [replies]);
+
+  useEffect(() => {
+    if (!isAutoPlaying || bubbles.length <= 1) return;
+    const interval = setInterval(() => {
+      setSelectedIndex((prev) => (prev + 1) % bubbles.length);
+      setTimerKey(prev => prev + 1);
+    }, 20000);
+    return () => clearInterval(interval);
+  }, [bubbles.length, isAutoPlaying, timerKey]);
+
+  if (!replies || replies.length === 0) {
+    return (
+      <div className="bg-[#1e293b]/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 text-slate-100 flex flex-col h-full items-center justify-center border-dashed min-h-[420px]">
+        <div className="p-4 bg-slate-800/50 rounded-full mb-4">
+          <MessageSquare size={32} className="text-slate-600" />
+        </div>
+        <p className="text-sm font-medium uppercase tracking-widest text-slate-500">No recent replies</p>
+      </div>
+    );
+  }
+
+  const selected = bubbles[selectedIndex] || bubbles[0] || {};
+
+  return (
+    <div className="bg-[#1e293b]/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 text-slate-100 flex flex-col h-full min-h-[420px] relative overflow-hidden group">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-pink-500/10 rounded-lg text-pink-400">
+            <MessageSquare size={20} />
+          </div>
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">Recent Replies</h2>
+            <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">
+              {bubbles.length} Replies in Range
+            </p>
+          </div>
+        </div>
+        
+        <button
+          onClick={() => {
+            setIsAutoPlaying(!isAutoPlaying);
+            setTimerKey(prev => prev + 1);
+          }}
+          className={`p-2 rounded-xl transition-all border border-slate-700/50 ${isAutoPlaying ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-400 hover:text-white bg-slate-800/50'}`}
+          title={isAutoPlaying ? "Pause Auto-play" : "Start Auto-play"}
+        >
+          {isAutoPlaying ? <Pause size={16} /> : <Play size={16} />}
+        </button>
+      </div>
+
+      <div className="flex-grow flex gap-4 mt-2 h-[320px]">
+        {/* Left: Bubbles - Structured Grid (Very Small) */}
+        <div className="w-[45%] border-r border-slate-700/30 pr-4 overflow-y-auto custom-scrollbar">
+          <div className="grid grid-cols-6 gap-2 p-1">
+            {bubbles.map((bubble, i) => (
+              <div
+                key={bubble.id}
+                onClick={() => {
+                  setSelectedIndex(i);
+                  setIsAutoPlaying(false);
+                  setTimerKey(prev => prev + 1);
+                }}
+                className={`relative aspect-square rounded-full cursor-pointer transition-all duration-300 hover:scale-110 active:scale-95 group/avatar ${selectedIndex === i ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-[#1e293b] scale-105 shadow-[0_0_15px_rgba(99,102,241,0.5)] z-10' : 'opacity-30 hover:opacity-100 grayscale hover:grayscale-0'}`}
+              >
+                <div className="w-full h-full rounded-full border border-slate-600/50 overflow-hidden bg-slate-800">
+                  <img 
+                    src={bubble.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(bubble.first_name + ' ' + bubble.last_name)}&background=random`} 
+                    className="w-full h-full object-cover"
+                    alt="" 
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(bubble.first_name + ' ' + bubble.last_name)}&background=random`;
+                    }}
+                  />
+                </div>
+                {selectedIndex === i && (
+                  <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-indigo-500 rounded-full border border-[#1e293b] animate-pulse"></div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right: Details */}
+        <div className="w-[55%] flex flex-col animate-in fade-in slide-in-from-right-4 duration-500" key={selectedIndex}>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src={selected.photo_url} 
+                className="w-10 h-10 rounded-xl border border-slate-700 object-cover shrink-0 shadow-lg" 
+                alt="" 
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selected.first_name + ' ' + selected.last_name)}&background=4f46e5&color=fff&bold=true`;
+                }}
+              />
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-white flex items-center gap-2 truncate">
+                  {selected.first_name} {selected.last_name}
+                  {selected.linkedin_url && (
+                    <a href={selected.linkedin_url} target="_blank" className="text-slate-500 hover:text-indigo-400 transition-colors shrink-0">
+                      <ExternalLink size={12} />
+                    </a>
+                  )}
+                </div>
+                <div className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">
+                  {selected.performed_at && new Date(selected.performed_at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2.5 flex-grow overflow-y-auto pr-1 custom-scrollbar">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 flex items-start gap-2.5 transition-colors hover:bg-slate-800/60">
+              <div className="p-1.5 bg-indigo-500/10 rounded-lg shrink-0">
+                <Briefcase size={10} className="text-indigo-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[8px] text-slate-500 uppercase font-bold">Campaign</p>
+                <p className="text-[10px] text-slate-200 truncate">{selected.campaign_name || 'N/A'}</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 flex items-start gap-2.5 transition-colors hover:bg-slate-800/60">
+              <div className="p-1.5 bg-pink-500/10 rounded-lg shrink-0">
+                <User size={10} className="text-pink-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[8px] text-slate-500 uppercase font-bold">From Profile</p>
+                <p className="text-[10px] text-slate-200 truncate">{selected.profile_name || 'Unknown'}</p>
+              </div>
+            </div>
+
+            <div className="bg-indigo-500/5 rounded-xl p-3 border border-indigo-500/10 min-h-[120px] relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-2 opacity-5">
+                <MessageSquare size={40} className="text-indigo-400" />
+              </div>
+              <p className="text-[8px] text-indigo-400 uppercase font-bold mb-2 flex items-center gap-2">
+                 Full Reply
+              </p>
+              <div className="text-[11px] text-slate-300 italic leading-relaxed relative z-10">
+                "{selected.message || 'No message text available.'}"
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 h-1 bg-indigo-500/5 w-full overflow-hidden">
+        {isAutoPlaying && (
+          <div className="h-full bg-indigo-500/40" key={timerKey} style={{ animation: `progress 20s linear forwards` }}></div>
+        )}
+      </div>
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        @keyframes progress {
+          from { width: 0%; }
+          to { width: 100%; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default function DashboardCharts({ dailyData, barData, campaignData, recentReplies }: DashboardChartsProps) {
   const [dailyTrendsType, setDailyTrendsType] = useState<'invites' | 'messages'>('invites');
   const [pieGroupType, setPieGroupType] = useState<'invites' | 'messages'>('invites');
 
@@ -429,10 +612,10 @@ export default function DashboardCharts({ dailyData, barData, campaignData }: Da
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         <CampaignCarouselChart data={campaignData} />
-        
-        <div className="bg-[#1e293b]/50 backdrop-blur-xl border border-slate-700/50 rounded-2xl shadow-xl p-6 text-slate-100 flex flex-col h-full items-center justify-center border-dashed min-h-[420px]">
-          <p className="text-sm font-medium uppercase tracking-widest text-slate-500">Coming Soon</p>
-        </div>
+        <RecentRepliesBubbles 
+          replies={recentReplies} 
+          key={`${recentReplies?.[0]?.performed_at}-${recentReplies?.length}`}
+        />
       </div>
     </div>
   );

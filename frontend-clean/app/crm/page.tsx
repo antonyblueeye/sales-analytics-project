@@ -280,14 +280,17 @@ export default function CRMPage() {
                 limit: '20'
             });
 
-            if (activeTab === 'all') {
-                if (currentFilters.search) params.append('search', currentFilters.search);
-                if (currentFilters.firstName) params.append('first_name', currentFilters.firstName);
-                if (currentFilters.lastName) params.append('last_name', currentFilters.lastName);
-                if (currentFilters.company) params.append('company', currentFilters.company);
-                if (currentFilters.location) params.append('location', currentFilters.location);
-                if (currentFilters.position) params.append('title', currentFilters.position);
-            }
+            if (currentFilters.search) params.append('search', currentFilters.search);
+            if (currentFilters.firstName) params.append('first_name', currentFilters.firstName);
+            if (currentFilters.lastName) params.append('last_name', currentFilters.lastName);
+            if (currentFilters.company) params.append('company', currentFilters.company);
+            if (currentFilters.location) params.append('location', currentFilters.location);
+            if (currentFilters.position) params.append('title', currentFilters.position);
+            
+            if (currentFilters.createDateRange?.from) params.append('create_date_from', currentFilters.createDateRange.from.toISOString());
+            if (currentFilters.createDateRange?.to) params.append('create_date_to', currentFilters.createDateRange.to.toISOString());
+            if (currentFilters.activityDateRange?.from) params.append('activity_date_from', currentFilters.activityDateRange.from.toISOString());
+            if (currentFilters.activityDateRange?.to) params.append('activity_date_to', currentFilters.activityDateRange.to.toISOString());
 
             const res = await axios.get(`${endpoint}?${params.toString()}`);
             const mappedLeads = res.data.leads.map((l: any, idx: number) => ({
@@ -336,7 +339,7 @@ export default function CRMPage() {
 
     // Debounce effect for filters
     useEffect(() => {
-        if (activeTab !== 'all') return; // Only 'all' tab uses live filters for now
+        // Now both tabs support filters
 
         const handler = setTimeout(() => {
             setCurrentPage(1); // Reset to first page on filter change
@@ -346,7 +349,9 @@ export default function CRMPage() {
                 lastName: filterLastName,
                 company: filterCompany,
                 location: filterLocation,
-                position: filterPosition
+                position: filterPosition,
+                createDateRange: filterCreateDate,
+                activityDateRange: filterActivityDate
             });
         }, 500); // 500ms debounce
 

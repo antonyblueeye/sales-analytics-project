@@ -1,3 +1,7 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text, and_
@@ -6,7 +10,7 @@ from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
 from models import Base, Campaign, Profile, Lead, Action
-from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history
+from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history, get_recent_replies
 from typing import Optional
 from datetime import datetime, time, timedelta, date
 from crm import get_leads_list, get_replied_leads
@@ -20,8 +24,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
 
 start_scheduler()
 
@@ -133,7 +135,6 @@ def total_leads(
     count = get_total_leads(db, from_dt, to_dt)
     return {"total_leads": count}
 
-
 @app.get("/analytics/profiles-summary")
 def profiles_summary(
     from_date: date,
@@ -162,21 +163,44 @@ def crm_leads(
     company: Optional[str] = None,
     location: Optional[str] = None,
     title: Optional[str] = None,
+    create_date_from: Optional[str] = None,
+    create_date_to: Optional[str] = None,
+    activity_date_from: Optional[str] = None,
+    activity_date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     data = get_leads_list(
-        db, page, limit, search, 
-        first_name, last_name, company, 
-        location, title
+        db, page, limit, search,
+        first_name, last_name, company,
+        location, title,
+        create_date_from, create_date_to,
+        activity_date_from, activity_date_to
     )
     return data
+
 @app.get("/crm/replied-leads")
 def crm_replied_leads(
     page: int = 1,
     limit: int = 20,
+    search: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    company: Optional[str] = None,
+    location: Optional[str] = None,
+    title: Optional[str] = None,
+    create_date_from: Optional[str] = None,
+    create_date_to: Optional[str] = None,
+    activity_date_from: Optional[str] = None,
+    activity_date_to: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    data = get_replied_leads(db, page, limit)
+    data = get_replied_leads(
+        db, page, limit, search,
+        first_name, last_name, company,
+        location, title,
+        create_date_from, create_date_to,
+        activity_date_from, activity_date_to
+    )
     return data
 
 @app.get("/analytics/campaigns-list")
@@ -200,3 +224,11 @@ def daily_summary(
     from analytics import get_daily_summary
     data = get_daily_summary(db, from_date, to_date)
     return data
+
+@app.get("/analytics/recent-replies")
+def recent_replies(
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db)
+):
+    return get_recent_replies(db, from_date, to_date)
