@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, Fragment, ReactNode, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import DateRangePicker from './components/DateRangePicker';
 import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus, Loader2 } from 'lucide-react';
@@ -47,7 +48,11 @@ interface StatCellProps {
 }
 
 const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, customClass, rowIndex }: StatCellProps) => {
-  const [isHovered, setIsHovered] = useState(false);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [visible, setVisible] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => { setMounted(true); }, []);
 
   const valNum = typeof value === 'string' ? parseFloat(value) : value;
   const prevValNum = typeof previousValue === 'string' ? parseFloat(previousValue) : previousValue;
@@ -59,18 +64,68 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
   const prevStartDate = subDays(startDate, duration);
   const prevEndDate = subDays(endDate, duration);
 
-  const showBelow = rowIndex < 2;
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+    setVisible(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    setMousePos({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseLeave = () => {
+    setVisible(false);
+    setMousePos(null);
+  };
+
+  const showBelow = mousePos ? mousePos.y < window.innerHeight / 2 : true;
+  const nearRightEdge = mousePos ? mousePos.x > window.innerWidth - 220 : false;
+
+  const tooltipEl = visible && mousePos && mounted ? (
+    <div
+      style={{
+        position: 'fixed',
+        zIndex: 99999,
+        pointerEvents: 'none',
+        left: nearRightEdge ? mousePos.x - 190 : mousePos.x - 90,
+        top: showBelow ? mousePos.y + 16 : mousePos.y - 116,
+      }}
+    >
+      <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-2xl min-w-[180px] backdrop-blur-xl">
+        <div className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">Previous Period</div>
+        <div className="text-[10px] text-slate-500 mb-2">
+          {format(prevStartDate, 'MMM dd')} - {format(prevEndDate, 'MMM dd, yyyy')}
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-sm font-semibold text-white">
+            {previousValue}{isPercentage ? '%' : ''}
+          </span>
+          <div className={`flex items-center gap-1 text-xs font-bold ${
+            trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400'
+          }`}>
+            {trend === 'up' ? '+' : ''}
+            {isPercentage ? diff.toFixed(1) : diff}
+            {isPercentage ? '%' : ''}
+          </div>
+        </div>
+      </div>
+      <div className={`w-2 h-2 bg-slate-800 border-slate-700 rotate-45 absolute ${
+        showBelow ? '-top-1 border-l border-t' : '-bottom-1 border-r border-b'
+      } left-[88px]`} />
+    </div>
+  ) : null;
 
   return (
     <td
       className={`px-4 py-3.5 text-right font-medium relative group ${customClass}`}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="flex items-center justify-end gap-1.5">
         <span>{value}{isPercentage ? '%' : ''}</span>
-        {isHovered && (
-          <div className="animate-in fade-in zoom-in duration-200">
+        {visible && (
+          <div>
             {trend === 'up' && <ArrowUp size={12} className="text-emerald-400" />}
             {trend === 'down' && <ArrowDown size={12} className="text-rose-400" />}
             {trend === 'equal' && <Minus size={12} className="text-slate-500" />}
@@ -78,28 +133,7 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
         )}
       </div>
 
-      {isHovered && (
-        <div className={`absolute ${showBelow ? 'top-full mt-2' : 'bottom-full mb-2'} right-0 z-[100] animate-in fade-in ${showBelow ? 'slide-in-from-top-2' : 'slide-in-from-bottom-2'} duration-300 pointer-events-none`}>
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-2xl min-w-[180px] backdrop-blur-xl">
-            <div className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">Previous Period</div>
-            <div className="text-[10px] text-slate-500 mb-2">
-              {format(prevStartDate, 'MMM dd')} - {format(prevEndDate, 'MMM dd, yyyy')}
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm font-semibold text-white">
-                {previousValue}{isPercentage ? '%' : ''}
-              </span>
-              <div className={`flex items-center gap-1 text-xs font-bold ${trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400'}`}>
-                {trend === 'up' ? '+' : trend === 'down' ? '' : ''}
-                {isPercentage ? diff.toFixed(1) : diff}
-                {isPercentage ? '%' : ''}
-              </div>
-            </div>
-          </div>
-          {/* Arrow */}
-          <div className={`w-2 h-2 bg-slate-800 border-slate-700 rotate-45 absolute ${showBelow ? '-top-1 border-l border-t' : '-bottom-1 border-r border-b'} right-4 transform translate-x-1/2`}></div>
-        </div>
-      )}
+      {mounted && tooltipEl && createPortal(tooltipEl, document.body)}
     </td>
   );
 };
