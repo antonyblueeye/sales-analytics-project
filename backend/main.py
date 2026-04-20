@@ -13,7 +13,7 @@ from models import Base, Campaign, Profile, Lead, Action
 from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history, get_recent_replies
 from typing import Optional
 from datetime import datetime, time, timedelta, date
-from crm import get_leads_list, get_replied_leads
+from crm import get_leads_list, get_replied_leads, get_lead_activities
 
 app = FastAPI()
 
@@ -202,6 +202,13 @@ def crm_replied_leads(
         activity_date_from, activity_date_to
     )
     return data
+
+@app.get("/crm/leads/{lead_id}/activities")
+def crm_lead_activities(
+    lead_id: int,
+    db: Session = Depends(get_db)
+):
+    return get_lead_activities(db, lead_id)
 
 @app.get("/analytics/campaigns-list")
 def campaigns_list(db: Session = Depends(get_db)):

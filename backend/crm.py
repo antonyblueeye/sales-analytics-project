@@ -29,7 +29,7 @@ def get_leads_list(
     params = {"offset": offset, "limit": limit}
     
     if search:
-        where_clauses.append("(first_name ILIKE :search OR last_name ILIKE :search OR current_employer ILIKE :search)")
+        where_clauses.append("(first_name ILIKE :search OR last_name ILIKE :search OR (first_name || ' ' || last_name) ILIKE :search OR current_employer ILIKE :search)")
         params["search"] = f"%{search}%"
     
     if first_name:
@@ -87,16 +87,16 @@ def get_leads_list(
             coalesce(l.current_title, '') as title,
             coalesce(l.location, '') as location,
             COALESCE(st.status, 'New') as status,
-            coalesce(st.campaign_names, '') as campaign_names,
-            coalesce(st.profile_names, '') as profile_names
+            COALESCE(st.campaign_names, ARRAY[]::text[]) as campaign_names,
+            COALESCE(st.profile_names, ARRAY[]::text[]) as profile_names
         FROM leads l
         LEFT JOIN (
             SELECT a.lead_id, 
                    CASE WHEN COUNT(CASE WHEN a.action_type = 'replied' THEN 1 END) > 0 THEN 'Replied'
                         WHEN COUNT(*) > 0 THEN 'Connected'
                         ELSE 'New' END as status,
-                   string_agg(DISTINCT c.name, ', ') as campaign_names,
-                   string_agg(DISTINCT p.name, ', ') as profile_names
+                   array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
+                   array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
             FROM actions a
             LEFT JOIN campaigns c ON a.campaign_id = c.id
             LEFT JOIN profiles p ON a.profile_id = p.id
@@ -142,6 +142,9 @@ def get_leads_list(
     # Attach messages to lead objects
     for lead in leads_list:
         lead['messages'] = messages_by_lead.get(lead['id'], [])
+        # Ensure arrays are lists (PostgreSQL returns them as Python lists already)
+        lead['campaign_names'] = lead.get('campaign_names') or []
+        lead['profile_names'] = lead.get('profile_names') or []
     
     return {
         "leads": leads_list,
@@ -172,7 +175,7 @@ def get_replied_leads(
     
     # ... previous filters ...
     if search:
-        where_clauses.append("(l.first_name ILIKE :search OR l.last_name ILIKE :search OR l.current_employer ILIKE :search)")
+        where_clauses.append("(l.first_name ILIKE :search OR l.last_name ILIKE :search OR (l.first_name || ' ' || l.last_name) ILIKE :search OR l.current_employer ILIKE :search)")
         params["search"] = f"%{search}%"
     
     if first_name:
@@ -240,8 +243,8 @@ def get_replied_leads(
     detailed_query = text("""
         WITH lead_metadata AS (
             SELECT a.lead_id,
-                   string_agg(DISTINCT c.name, ', ') as campaign_names,
-                   string_agg(DISTINCT p.name, ', ') as profile_names
+                   array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
+                   array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
             FROM actions a
             LEFT JOIN campaigns c ON a.campaign_id = c.id
             LEFT JOIN profiles p ON a.profile_id = p.id
@@ -292,8 +295,8 @@ def get_replied_leads(
                 "title": r['title'],
                 "location": r['location'],
                 "status": "Replied",
-                "campaign_names": r['campaign_names'] or '',
-                "profile_names": r['profile_names'] or '',
+                "campaign_names": list(r['campaign_names']) if r['campaign_names'] else [],
+                "profile_names": list(r['profile_names']) if r['profile_names'] else [],
                 "last_reply_at": last_reply.isoformat() if last_reply else None,
                 "messages": []
             }
@@ -315,3 +318,34 @@ def get_replied_leads(
         "page": page,
         "limit": limit
     }
+
+def get_lead_activities(db: Session, lead_id: int):
+    """Fetch all actions for a single lead, with campaign and profile info."""
+    query = text("""
+        SELECT
+            a.id,
+            a.action_type,
+            a.message,
+            a.performed_at,
+            COALESCE(c.name, '') as campaign_name,
+            COALESCE(p.name, '') as profile_name,
+            p.id as profile_id
+        FROM actions a
+        LEFT JOIN campaigns c ON a.campaign_id = c.id
+        LEFT JOIN profiles p ON a.profile_id = p.id
+        WHERE a.lead_id = :lead_id
+        ORDER BY a.performed_at ASC
+    """)
+    result = db.execute(query, {"lead_id": lead_id})
+    activities = []
+    for row in result:
+        r = row._mapping
+        activities.append({
+            "id": r["id"],
+            "type": r["action_type"],
+            "message": r["message"] or "",
+            "date": r["performed_at"].isoformat() if r["performed_at"] else None,
+            "campaign": r["campaign_name"],
+            "profile": r["profile_name"],
+        })
+    return {"activities": activities}
