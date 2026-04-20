@@ -21,7 +21,11 @@ import {
     Calendar as CalendarIcon,
     Star,
     Mail,
-    Send
+    Send,
+    UserPlus,
+    MessageSquare,
+    UserCircle,
+    Clock,
 } from 'lucide-react';
 import axios from 'axios';
 
@@ -136,9 +140,9 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                     <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
                         <button
                             onClick={() => setIsOpen(false)}
-                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
+                            className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
                         >
-                            Apply
+                            Done
                         </button>
                     </div>
                 </div>
@@ -269,7 +273,7 @@ function ActivityItem({ activity, cfg, isReply, hasMsg, leadPhoto, leadName, sho
     const senderFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=${isReply ? '6366f1' : '4f46e5'}&color=fff&bold=true`;
 
     return (
-        <div className="group relative flex gap-3 pl-1 py-2.5 pr-2 rounded-xl hover:bg-slate-800/40 transition-all">
+        <div className="group relative flex gap-3 pl-1 py-2.5 pr-10 rounded-xl hover:bg-slate-800/40 transition-all">
             {/* Timeline dot */}
             <div className="relative flex flex-col items-center shrink-0" style={{ width: '44px' }}>
                 <div className={`w-4 h-4 rounded-full border-2 border-slate-900 shadow-md mt-1 shrink-0 ${cfg.dot} ring-2 ring-slate-900`} />
@@ -278,31 +282,34 @@ function ActivityItem({ activity, cfg, isReply, hasMsg, leadPhoto, leadName, sho
             {/* Content */}
             <div className="flex-1 min-w-0">
                 {/* Top row: badge + date + delete */}
-                <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="flex items-baseline justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-[11px] font-bold border capitalize ${cfg.color}`}>
                             {cfg.label}
                         </span>
                         {activity.isLocal && (
-                            <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md">LOCAL</span>
+                            <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md">LOGGED</span>
                         )}
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
                         {activity.date && (
                             <span className="text-[10px] text-slate-500 font-medium whitespace-nowrap">
-                                {format(parseISO(activity.date), 'MMM d, yyyy')}
+                                {format(parseISO(activity.date), 'MMM d, yyyy HH:mm')}
                             </span>
-                        )}
-                        {activity.isLocal && (
-                            <button
-                                onClick={() => onDelete(activity.id)}
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-rose-500/20 hover:text-rose-500 rounded-md text-slate-600 transition-all"
-                            >
-                                <X size={12} />
-                            </button>
                         )}
                     </div>
                 </div>
+
+                {/* Absolutely positioned delete button for local activities */}
+                {activity.isLocal && (
+                    <button
+                        onClick={() => onDelete(activity.id)}
+                        className="absolute right-2 top-2.5 opacity-0 group-hover:opacity-100 p-1.5 hover:bg-rose-500/20 hover:text-rose-500 rounded-lg text-slate-400 transition-all z-10"
+                        title="Delete entry"
+                    >
+                        <X size={14} />
+                    </button>
+                )}
 
                 {/* Sender row */}
                 {(isReply || (showProfile && !isReply)) && (senderName || activity.campaign) && (
@@ -399,8 +406,36 @@ export default function CRMPage() {
     const [activityProfileFilter, setActivityProfileFilter] = useState<string>('all');
     const [selectedCampaign, setSelectedCampaign] = useState<string>('');
     const [selectedActivityProfile, setSelectedActivityProfile] = useState<string>('');
+    const [activityMessage, setActivityMessage] = useState<string>('');
+    const [activityTime, setActivityTime] = useState<string>(new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
     const [isActivityProfileDropdownOpen, setIsActivityProfileDropdownOpen] = useState(false);
     const activityProfileDropdownRef = useRef<HTMLDivElement>(null);
+
+    const [isLogProfileOpen, setIsLogProfileOpen] = useState(false);
+    const logProfileRef = useRef<HTMLDivElement>(null);
+    const [isLogCampaignOpen, setIsLogCampaignOpen] = useState(false);
+    const logCampaignRef = useRef<HTMLDivElement>(null);
+    const [isLogActivityTypeOpen, setIsLogActivityTypeOpen] = useState(false);
+    const logActivityTypeRef = useRef<HTMLDivElement>(null);
+
+    const [allProfiles, setAllProfiles] = useState<string[]>([]);
+    const [allCampaigns, setAllCampaigns] = useState<string[]>([]);
+
+    useEffect(() => {
+        const fetchMetadata = async () => {
+            try {
+                const [pRes, cRes] = await Promise.all([
+                    axios.get('http://localhost:8000/profiles'),
+                    axios.get('http://localhost:8000/analytics/campaigns-list')
+                ]);
+                setAllProfiles(pRes.data.map((p: any) => p.name));
+                setAllCampaigns(cRes.data);
+            } catch (e) {
+                console.error('Failed to fetch metadata', e);
+            }
+        };
+        fetchMetadata();
+    }, []);
 
     const fetchLeads = async (page: number, currentFilters: any = {}) => {
         setIsLoading(true);
@@ -445,7 +480,7 @@ export default function CRMPage() {
                 hubspotUrl: '',
                 messages: l.messages || [],
                 activities: [],
-                createdAt: l.last_reply_at || '2026-04-15',
+                createdAt: l.created_at || '2026-04-15',
                 lastActivityAt: l.last_reply_at || '2026-04-15'
             }));
             setLeads(mappedLeads);
@@ -505,8 +540,18 @@ export default function CRMPage() {
 
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
-            if (activityProfileDropdownRef.current && !activityProfileDropdownRef.current.contains(event.target as Node)) {
+            const target = event.target as Node;
+            if (activityProfileDropdownRef.current && !activityProfileDropdownRef.current.contains(target)) {
                 setIsActivityProfileDropdownOpen(false);
+            }
+            if (logProfileRef.current && !logProfileRef.current.contains(target)) {
+                setIsLogProfileOpen(false);
+            }
+            if (logCampaignRef.current && !logCampaignRef.current.contains(target)) {
+                setIsLogCampaignOpen(false);
+            }
+            if (logActivityTypeRef.current && !logActivityTypeRef.current.contains(target)) {
+                setIsLogActivityTypeOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -531,11 +576,11 @@ export default function CRMPage() {
                 campaign: a.campaign,
                 profile: a.profile,
             }));
-            
+
             // Auto-select first profile for the timeline filter
             const firstProfile = fetched.find(a => !a.isLocal && a.profile)?.profile || 'all';
             setActivityProfileFilter(firstProfile);
-            
+
             setActiveLead(prev => prev ? { ...prev, activities: fetched } : prev);
         } catch (e) {
             console.error('Failed to load activities', e);
@@ -556,21 +601,40 @@ export default function CRMPage() {
             return;
         }
 
+        if ((selectedActivity === 'messaged' || selectedActivity === 'replied') && !activityMessage.trim()) {
+            alert('Please enter a message for this activity type');
+            return;
+        }
+
+        const combinedDateTime = `${activityDate}T${activityTime}:00`;
+
         const newActivity: LeadActivity = {
             id: Date.now(),
             type: selectedActivity,
-            message: '',
-            date: activityDate,
+            message: activityMessage,
+            date: combinedDateTime,
             campaign: selectedCampaign,
             profile: selectedActivityProfile,
             isLocal: true
         };
+
+        const updatedProfileNames = activeLead.profileNames.includes(selectedActivityProfile)
+            ? activeLead.profileNames
+            : [...activeLead.profileNames, selectedActivityProfile];
+
         const updatedLead = {
             ...activeLead,
-            activities: [newActivity, ...activeLead.activities]
+            profileNames: updatedProfileNames,
+            activities: [...activeLead.activities, newActivity].sort((a, b) => {
+                const timeA = a.date ? new Date(a.date).getTime() : 0;
+                const timeB = b.date ? new Date(b.date).getTime() : 0;
+                if (timeA !== timeB) return timeA - timeB;
+                return a.id - b.id;
+            })
         };
         setActiveLead(updatedLead);
         setSelectedLead(updatedLead);
+        setActivityMessage('');
         showToast(`${selectedActivity.toUpperCase()} on ${activityDate}`);
     };
 
@@ -585,12 +649,16 @@ export default function CRMPage() {
     };
 
     const activityTypes = [
+        { value: 'invited', label: 'Invited', icon: UserPlus },
+        { value: 'accepted', label: 'Accepted', icon: UserCheck },
+        { value: 'replied', label: 'Replied', icon: MessageSquare },
+        { value: 'messaged', label: 'Message Sent', icon: Send },
         { value: 'interested', label: 'Interested', icon: Star },
         { value: 'call', label: 'Call', icon: Phone },
         { value: 'mql', label: 'MQL', icon: Mail },
         { value: 'sql', label: 'SQL', icon: Briefcase },
         { value: 'partner', label: 'Partner', icon: Handshake },
-        { value: 'client', label: 'Client', icon: UserCheck },
+        { value: 'client', label: 'Client', icon: UserCircle },
     ];
 
     // Handle lead selection for animation
@@ -1121,79 +1189,186 @@ export default function CRMPage() {
                                     <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Log Activity</h3>
                                     <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 space-y-4">
                                         <div className="flex flex-col gap-4">
-                                            {/* Profile Selector */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Select Profile</label>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {activeLead?.profileNames ? activeLead.profileNames.filter(Boolean).map(pName => (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                {/* Profile Selector Dropdown */}
+                                                <div className="flex flex-col gap-2 w-full" ref={logProfileRef}>
+                                                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1 tracking-wider">Profile</label>
+                                                    <div className="relative">
                                                         <button
-                                                            key={pName}
-                                                            onClick={() => setSelectedActivityProfile(pName)}
-                                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${selectedActivityProfile === pName
-                                                                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-lg shadow-indigo-600/10'
-                                                                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'
-                                                                }`}
+                                                            onClick={() => setIsLogProfileOpen(!isLogProfileOpen)}
+                                                            className={`w-full flex items-center gap-2.5 bg-slate-900 border rounded-xl px-3 py-2 transition-all outline-none ${isLogProfileOpen ? 'border-indigo-500 shadow-[0_0_15px_-5px_rgba(99,102,241,0.4)]' : 'border-slate-700 hover:border-slate-500'}`}
                                                         >
-                                                            {pName}
+                                                            <div className="relative shrink-0">
+                                                                <img
+                                                                    src={`/${selectedActivityProfile}.jpg`}
+                                                                    onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedActivityProfile || 'P')}&background=4f46e5&color=fff&bold=true`; }}
+                                                                    className="w-5 h-5 rounded-full object-cover border border-slate-700"
+                                                                    alt=""
+                                                                />
+                                                            </div>
+                                                            <span className={`text-[11px] font-bold truncate flex-1 text-left ${selectedActivityProfile ? 'text-slate-200' : 'text-slate-600'}`}>
+                                                                {selectedActivityProfile || 'Select Profile'}
+                                                            </span>
+                                                            <ChevronDown size={14} className={`text-slate-500 transition-transform duration-200 ${isLogProfileOpen ? 'rotate-180' : ''}`} />
                                                         </button>
-                                                    )) : (
-                                                        <div className="text-[10px] text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
-                                                            No associated profiles found
-                                                        </div>
-                                                    )}
+
+                                                        {isLogProfileOpen && (
+                                                            <div className="absolute left-0 mt-2 w-full bg-slate-900/95 backdrop-blur-xl border border-slate-700 shadow-2xl z-[110] py-2 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                                                <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                                                    {(allProfiles.length > 0 ? allProfiles : activeLead?.profileNames?.filter(Boolean) || []).map(p => (
+                                                                        <button
+                                                                            key={p}
+                                                                            onClick={() => {
+                                                                                setSelectedActivityProfile(p);
+                                                                                setIsLogProfileOpen(false);
+                                                                            }}
+                                                                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-all text-left ${p === selectedActivityProfile ? 'bg-indigo-500/10' : ''}`}
+                                                                        >
+                                                                            <img
+                                                                                src={`/${p}.jpg`}
+                                                                                onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p)}&background=4f46e5&color=fff&bold=true`; }}
+                                                                                className={`w-5 h-5 rounded-full object-cover border ${p === selectedActivityProfile ? 'border-indigo-500' : 'border-slate-700'}`}
+                                                                                alt=""
+                                                                            />
+                                                                            <span className={`text-[11px] font-bold ${p === selectedActivityProfile ? 'text-white' : 'text-slate-400'}`}>{p}</span>
+                                                                            {p === selectedActivityProfile && <div className="ml-auto w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Campaign Selector Dropdown */}
+                                                <div className="flex flex-col gap-2 w-full" ref={logCampaignRef}>
+                                                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1 tracking-wider">Campaign</label>
+                                                    <div className="relative">
+                                                        <button
+                                                            onClick={() => setIsLogCampaignOpen(!isLogCampaignOpen)}
+                                                            className={`w-full flex items-center gap-2.5 bg-slate-900 border rounded-xl px-3 py-2 transition-all outline-none ${isLogCampaignOpen ? 'border-indigo-500 shadow-[0_0_15px_-5px_rgba(99,102,241,0.4)]' : 'border-slate-700 hover:border-slate-500'}`}
+                                                        >
+                                                            <div className="w-5 h-5 rounded-lg bg-slate-800 flex items-center justify-center text-slate-500">
+                                                                <Globe size={12} />
+                                                            </div>
+                                                            <span className={`text-[11px] font-bold truncate flex-1 text-left ${selectedCampaign ? 'text-slate-200' : 'text-slate-600'}`}>
+                                                                {selectedCampaign || 'Select Campaign'}
+                                                            </span>
+                                                            <ChevronDown size={14} className={`text-slate-500 transition-transform duration-200 ${isLogCampaignOpen ? 'rotate-180' : ''}`} />
+                                                        </button>
+
+                                                        {isLogCampaignOpen && (
+                                                            <div className="absolute left-0 mt-2 w-full bg-slate-900/95 backdrop-blur-xl border border-slate-700 shadow-2xl z-[110] py-2 rounded-2xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                                                                <div className="max-h-60 overflow-y-auto custom-scrollbar">
+                                                                    {(allCampaigns.length > 0 ? allCampaigns : activeLead?.campaignNames?.filter(Boolean) || []).map(c => (
+                                                                        <button
+                                                                            key={c}
+                                                                            onClick={() => {
+                                                                                setSelectedCampaign(c);
+                                                                                setIsLogCampaignOpen(false);
+                                                                            }}
+                                                                            className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-all text-left ${c === selectedCampaign ? 'bg-indigo-500/10' : ''}`}
+                                                                        >
+                                                                            <div className={`p-1.5 rounded-lg ${c === selectedCampaign ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+                                                                                <Globe size={11} />
+                                                                            </div>
+                                                                            <span className={`text-[11px] font-bold truncate ${c === selectedCampaign ? 'text-white' : 'text-slate-400'}`}>{c}</span>
+                                                                            {c === selectedCampaign && <div className="ml-auto w-1.5 h-1.5 bg-indigo-500 rounded-full" />}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Activity Type Dropdown */}
+                                                <div className="flex flex-col gap-2 w-full" ref={logActivityTypeRef}>
+                                                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1 tracking-wider">Activity</label>
+                                                    <div className="relative">
+                                                        <button
+                                                            onClick={() => setIsLogActivityTypeOpen(!isLogActivityTypeOpen)}
+                                                            className={`w-full flex items-center gap-2.5 bg-slate-900 border rounded-xl px-3 py-2 transition-all outline-none ${isLogActivityTypeOpen ? 'border-indigo-500 shadow-[0_0_15px_-5px_rgba(99,102,241,0.4)]' : 'border-slate-700 hover:border-slate-500'}`}
+                                                        >
+                                                            {(() => {
+                                                                const activeType = activityTypes.find(t => t.value === selectedActivity);
+                                                                return (
+                                                                    <>
+                                                                        <div className={`w-5 h-5 rounded-lg flex items-center justify-center ${activeType ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+                                                                            {activeType ? <activeType.icon size={12} /> : <Star size={12} />}
+                                                                        </div>
+                                                                        <span className="text-[11px] font-bold flex-1 text-left text-slate-200">
+                                                                            {activeType?.label || 'Select Type'}
+                                                                        </span>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                            <ChevronDown size={14} className={`text-slate-500 transition-transform duration-200 ${isLogActivityTypeOpen ? 'rotate-180' : ''}`} />
+                                                        </button>
+
+                                                        {isLogActivityTypeOpen && (
+                                                            <div className="absolute left-0 mt-2 w-full bg-slate-900/95 backdrop-blur-xl border border-slate-700 shadow-2xl z-[110] py-1 rounded-2xl overflow-y-auto max-h-[240px] animate-in fade-in slide-in-from-top-2 duration-200 custom-scrollbar">
+                                                                {activityTypes.map(type => (
+                                                                    <button
+                                                                        key={type.value}
+                                                                        onClick={() => {
+                                                                            setSelectedActivity(type.value);
+                                                                            setIsLogActivityTypeOpen(false);
+                                                                        }}
+                                                                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-white/5 transition-all text-left ${type.value === selectedActivity ? 'bg-indigo-500/10' : ''}`}
+                                                                    >
+                                                                        <div className={`p-1.5 rounded-lg ${type.value === selectedActivity ? 'bg-indigo-500/30 text-indigo-300' : 'bg-slate-800 text-slate-500'}`}>
+                                                                            <type.icon size={12} />
+                                                                        </div>
+                                                                        <span className={`text-[11px] font-bold ${type.value === selectedActivity ? 'text-white' : 'text-slate-400'}`}>{type.label}</span>
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            {/* Campaign Selector */}
-                                            <div className="flex flex-col gap-2">
-                                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Select Campaign</label>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {activeLead?.campaignNames ? activeLead.campaignNames.filter(Boolean).map(cName => (
-                                                        <button
-                                                            key={cName}
-                                                            onClick={() => setSelectedCampaign(cName)}
-                                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-all ${selectedCampaign === cName
-                                                                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-400 shadow-lg shadow-indigo-600/10'
-                                                                    : 'bg-slate-900 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'
-                                                                }`}
-                                                        >
-                                                            {cName}
-                                                        </button>
-                                                    )) : (
-                                                        <div className="text-[10px] text-rose-500 bg-rose-500/10 px-3 py-1.5 rounded-lg border border-rose-500/20">
-                                                            No associated campaigns found
-                                                        </div>
-                                                    )}
+                                            {/* Optional/Required Message Textarea for specific types */}
+                                            {(selectedActivity === 'invited' || selectedActivity === 'messaged' || selectedActivity === 'replied') && (
+                                                <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                                    <label className="text-[10px] uppercase font-bold text-slate-500 ml-1 tracking-wider">
+                                                        Message {selectedActivity === 'invited' ? '(Optional)' : '(Required)'}
+                                                    </label>
+                                                    <textarea
+                                                        value={activityMessage}
+                                                        onChange={(e) => setActivityMessage(e.target.value)}
+                                                        placeholder={`Enter ${selectedActivity} message here...`}
+                                                        className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-[11px] text-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none min-h-[80px] custom-scrollbar"
+                                                    />
                                                 </div>
-                                            </div>
+                                            )}
 
-                                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                                                {activityTypes.map((type) => (
-                                                    <button
-                                                        key={type.value}
-                                                        onClick={() => setSelectedActivity(type.value)}
-                                                        title={type.label}
-                                                        className={`flex flex-col items-center justify-center gap-1.5 p-2 rounded-xl border transition-all ${selectedActivity === type.value
-                                                            ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
-                                                            : 'bg-slate-900 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                                                            }`}
-                                                    >
-                                                        <type.icon size={18} />
-                                                        <span className="text-[8.5px] font-bold uppercase tracking-tighter">{type.label}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <div className="flex items-center gap-3">
-                                                <DatePickerButton
-                                                    date={activityDate}
-                                                    onSelect={setActivityDate}
-                                                    popoverDirection="up"
-                                                    popoverAlignment="left"
-                                                    className="flex-1"
-                                                />
+                                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                                                <div className="flex items-center gap-2 flex-1">
+                                                    <DatePickerButton
+                                                        date={activityDate}
+                                                        onSelect={setActivityDate}
+                                                        popoverDirection="up"
+                                                        popoverAlignment="left"
+                                                        className="flex-1"
+                                                    />
+                                                    <div className="relative group flex-1">
+                                                        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
+                                                            <Clock size={14} />
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            value={activityTime}
+                                                            onChange={(e) => setActivityTime(e.target.value)}
+                                                            placeholder="HH:MM"
+                                                            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded-xl pl-9 pr-3 h-[30px] outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                                                        />
+                                                    </div>
+                                                </div>
                                                 <button
                                                     onClick={handleSaveActivity}
-                                                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95 whitespace-nowrap"
+                                                    className="px-6 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20 active:scale-95 whitespace-nowrap"
                                                 >
                                                     Save Activity
                                                 </button>
@@ -1210,15 +1385,15 @@ export default function CRMPage() {
                                             Loading activity history...
                                         </div>
                                     ) : activeLead?.activities && activeLead.activities.length > 0 ? (() => {
-                                        // Unique profiles from DB activities (exclude local)
+                                        // Unique profiles from activities (including local)
                                         const dbProfiles = Array.from(
-                                            new Set(activeLead.activities.filter(a => !a.isLocal && a.profile).map(a => a.profile))
+                                            new Set(activeLead.activities.filter(a => a.profile).map(a => a.profile))
                                         ).filter(Boolean) as string[];
                                         const multiProfile = dbProfiles.length > 1;
 
                                         const filtered = activityProfileFilter === 'all'
                                             ? activeLead.activities
-                                            : activeLead.activities.filter(a => a.isLocal || a.profile === activityProfileFilter);
+                                            : activeLead.activities.filter(a => a.profile === activityProfileFilter);
 
                                         return (
                                             <div>
@@ -1234,7 +1409,7 @@ export default function CRMPage() {
                                                     {/* Profile switcher dropdown */}
                                                     {multiProfile ? (
                                                         <div className="relative" ref={activityProfileDropdownRef}>
-                                                            <button 
+                                                            <button
                                                                 onClick={() => setIsActivityProfileDropdownOpen(!isActivityProfileDropdownOpen)}
                                                                 className={`flex items-center gap-1.5 bg-slate-800/60 border rounded-xl px-2.5 py-1.5 transition-all outline-none ${isActivityProfileDropdownOpen ? 'border-indigo-500 shadow-[0_0_15px_-5px_rgba(99,102,241,0.4)]' : 'border-slate-700/50 hover:border-slate-500'}`}
                                                             >

@@ -93,6 +93,11 @@ def get_campaigns(db: Session = Depends(get_db)):
     campaigns = db.query(Campaign).all()
     return campaigns
 
+@app.get("/profiles")
+def get_profiles(db: Session = Depends(get_db)):
+    profiles = db.query(Profile).all()
+    return profiles
+
 # Нужно запомнить, что пост запросы вызываются только через /docs, а не прописываются в 
 # браузерной строке
 @app.post("/sync-all")

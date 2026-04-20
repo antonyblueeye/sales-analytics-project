@@ -88,10 +88,12 @@ def get_leads_list(
             coalesce(l.location, '') as location,
             COALESCE(st.status, 'New') as status,
             COALESCE(st.campaign_names, ARRAY[]::text[]) as campaign_names,
-            COALESCE(st.profile_names, ARRAY[]::text[]) as profile_names
+            COALESCE(st.profile_names, ARRAY[]::text[]) as profile_names,
+            COALESCE(st.first_action_at, l.created_at) as created_at
         FROM leads l
         LEFT JOIN (
             SELECT a.lead_id, 
+                   MIN(a.performed_at) as first_action_at,
                    CASE WHEN COUNT(CASE WHEN a.action_type = 'replied' THEN 1 END) > 0 THEN 'Replied'
                         WHEN COUNT(*) > 0 THEN 'Connected'
                         ELSE 'New' END as status,
@@ -108,7 +110,13 @@ def get_leads_list(
     """)
     
     result = db.execute(query, params)
-    leads_list = [dict(row._mapping) for row in result]
+    leads_list = []
+    for row in result:
+        row_dict = dict(row._mapping)
+        if row_dict.get('created_at'):
+            if isinstance(row_dict['created_at'], (date, datetime)):
+                row_dict['created_at'] = row_dict['created_at'].isoformat()
+        leads_list.append(row_dict)
     
     if not leads_list:
         return {"leads": [], "total": 0, "page": page, "limit": limit}
@@ -221,9 +229,11 @@ def get_replied_leads(
     """)
     total_count = db.execute(total_count_query, params).scalar()
     
-    # Get lead IDs for the current page, sorted by latest reply
+    # Get lead IDs and their first/last action dates for grouping and filtering
     lead_ids_query = text(f"""
-        SELECT a.lead_id, MAX(a.performed_at) as last_reply_at
+        SELECT a.lead_id, 
+               MAX(a.performed_at) as last_reply_at,
+               (SELECT MIN(performed_at) FROM actions WHERE lead_id = a.lead_id) as first_action_at
         FROM actions a
         JOIN leads l ON a.lead_id = l.id
         {where_sql}
@@ -284,6 +294,7 @@ def get_replied_leads(
         lid = r['lead_id']
         if lid not in leads_dict:
             last_reply = next(item['last_reply_at'] for item in lead_data_list if item['lead_id'] == lid)
+            first_action = next(item['first_action_at'] for item in lead_data_list if item['lead_id'] == lid)
             leads_dict[lid] = {
                 "id": lid,
                 "first_name": r['first_name'],
@@ -298,6 +309,7 @@ def get_replied_leads(
                 "campaign_names": list(r['campaign_names']) if r['campaign_names'] else [],
                 "profile_names": list(r['profile_names']) if r['profile_names'] else [],
                 "last_reply_at": last_reply.isoformat() if last_reply else None,
+                "created_at": first_action.isoformat() if first_action else None,
                 "messages": []
             }
         
