@@ -497,9 +497,9 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
         </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 h-1 bg-indigo-500/5 w-full overflow-hidden">
+      <div className="absolute bottom-0 left-0 h-1 bg-indigo-500/20 w-full overflow-hidden">
         {isAutoPlaying && (
-          <div className="h-full bg-indigo-500/40" key={timerKey} style={{ animation: `progress 20s linear forwards` }}></div>
+          <div className="h-full bg-indigo-500" key={timerKey} style={{ animation: `progress 20s linear forwards` }}></div>
         )}
       </div>
       <style jsx>{`

@@ -16,9 +16,9 @@ def add_profiles():
         if not existing:
             profile = Profile(name=p["name"], api_key=p["api_key"])
             db.add(profile)
-            print(f"Добавлен профиль: {p['name']}")
+            print(f"Added profile: {p['name']}")
         else:
-            print(f"Профиль {p['name']} уже существует")
+            print(f"Profile {p['name']} already exists")
     db.commit()
     db.close()
 
