@@ -8,10 +8,12 @@ import {
     Settings,
     TrendingUp,
     Calendar,
+    Target,
 } from 'lucide-react';
 
 const navItems = [
     { name: 'Analytics Overview', href: '/', icon: LayoutDashboard },
+    { name: 'Campaigns', href: '/campaigns', icon: Target },
     { name: 'Leads Analytics', href: '/leads', icon: Users },
     { name: 'Responses Analytics', href: '/responses', icon: Mail },
     { name: 'CRM', href: '/crm', icon: Calendar },

@@ -1353,7 +1353,7 @@ export default function CRMPage() {
                                                         popoverAlignment="left"
                                                         className="flex-1"
                                                     />
-                                                    <div className="relative group flex-1">
+                                                    <div className="relative group w-[85px] shrink-0">
                                                         <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-indigo-400 transition-colors">
                                                             <Clock size={14} />
                                                         </div>
@@ -1362,7 +1362,7 @@ export default function CRMPage() {
                                                             value={activityTime}
                                                             onChange={(e) => setActivityTime(e.target.value)}
                                                             placeholder="HH:MM"
-                                                            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded-xl pl-9 pr-3 h-[30px] outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
+                                                            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-bold rounded-xl pl-9 pr-2 h-[30px] outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
                                                         />
                                                     </div>
                                                 </div>

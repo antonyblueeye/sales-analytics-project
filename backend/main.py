@@ -244,3 +244,11 @@ def recent_replies(
     db: Session = Depends(get_db)
 ):
     return get_recent_replies(db, from_date, to_date)
+
+@app.get("/analytics/campaign-sequence")
+def campaign_sequence(
+    campaign_name: str,
+    db: Session = Depends(get_db)
+):
+    from analytics import get_campaign_sequence
+    return get_campaign_sequence(db, campaign_name)
