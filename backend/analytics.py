@@ -5,16 +5,17 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from models import Action, Lead
-from sqlalchemy import and_
-from datetime import datetime, date
+from models import Action, Lead, MessageTemplate, MessageTemplateMap, Campaign, Profile
+from sqlalchemy import and_, func
+from datetime import datetime, date, timedelta
+from collections import defaultdict
 
 def get_total_actions(db: Session, from_date: datetime = None, to_date: datetime = None) -> int:
     query = db.query(Action)
     if from_date:
         query = query.filter(Action.performed_at >= from_date)
     if to_date:
-        query = query.filter(Action.performed_at < to_date)   # строго меньше, чтобы включить весь день
+        query = query.filter(Action.performed_at < to_date)
     return query.count()
 
 def get_total_leads(db: Session, from_date: datetime = None, to_date: datetime = None) -> int:
@@ -25,17 +26,8 @@ def get_total_leads(db: Session, from_date: datetime = None, to_date: datetime =
         query = query.filter(Lead.created_at < to_date)
     return query.count()
 
-
 def get_profiles_summary(db: Session, from_date: date, to_date: date):
-    """
-    Возвращает сводку по профилям: инвайты, принятые, сообщения, ответы и проценты.
-    Фильтрует действия по диапазону дат (performed_at).
-    """
-    # Сдвигаем конечную дату на +1 день, чтобы поиск захватил весь последний день (до 23:59:59)
-    # так как performed_at содержит время.
-    from datetime import timedelta
     next_day = to_date + timedelta(days=1)
-    
     sql = text("""
         SELECT 
             p.name,
@@ -58,7 +50,6 @@ def get_profiles_summary(db: Session, from_date: date, to_date: date):
         ORDER BY p.name
     """)
     result = db.execute(sql, {"from_date": from_date, "next_day": next_day})
-    # Превращаем результат в список словарей для удобства фронта
     return [
         {
             "profile_name": row.name,
@@ -72,17 +63,8 @@ def get_profiles_summary(db: Session, from_date: date, to_date: date):
         for row in result
     ]
 
-
 def get_campaigns_summary(db: Session, from_date: date, to_date: date):
-    """
-    Возвращает сводку по кампейнам: инвайты, принятые, сообщения, ответы и проценты.
-    Фильтрует действия по диапазону дат (performed_at).
-    """
-    # Сдвигаем конечную дату на +1 день, чтобы поиск захватил весь последний день (до 23:59:59)
-    # так как performed_at содержит время.
-    from datetime import timedelta
     next_day = to_date + timedelta(days=1)
-    
     sql = text("""
         with clean_campaigns as (
             select 
@@ -113,7 +95,6 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
         order by p.name;    
     """)
     result = db.execute(sql, {"from_date": from_date, "next_day": next_day})
-    # Превращаем результат в список словарей для удобства фронта
     return [
         {
             "campaign_name": row.clean_campaign,
@@ -129,9 +110,6 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
     ]
 
 def get_campaigns_list(db: Session):
-    """
-    Returns a unique list of campaign names after cleaning (removing [Tags] etc.)
-    """
     sql = text("""
         SELECT DISTINCT trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign
         FROM campaigns
@@ -142,12 +120,8 @@ def get_campaigns_list(db: Session):
     return [row.clean_campaign for row in result if row.clean_campaign]
 
 def get_campaign_history(db: Session, campaign_name: str, granularity: str):
-    """
-    Returns historical data for a specific campaign aggregated by day, week, or month.
-    """
     if granularity not in ['day', 'week', 'month']:
         granularity = 'day'
-        
     sql = text(f"""
         WITH clean_campaigns AS (
             SELECT 
@@ -180,12 +154,7 @@ def get_campaign_history(db: Session, campaign_name: str, granularity: str):
     ]
 
 def get_daily_summary(db: Session, from_date: date, to_date: date):
-    """
-    Returns daily aggregates of actions (invites, accepts, messages, replies) across the dataset.
-    """
-    from datetime import timedelta
     next_day = to_date + timedelta(days=1)
-    
     sql = text("""
         SELECT 
             date_trunc('day', a.performed_at) as date,
@@ -211,16 +180,8 @@ def get_daily_summary(db: Session, from_date: date, to_date: date):
     ]
 
 def get_recent_replies(db: Session, from_date: date, to_date: date):
-    """
-    Returns a list of recent replies with lead info (name, photo, message text).
-    """
-    from datetime import timedelta
     import re
-    from models import Campaign, Profile, Action, Lead
     next_day = to_date + timedelta(days=1)
-    
-    from sqlalchemy import func
-    # Запрос через ORM: берем Action как основу и цепляем связанные таблицы
     results = db.query(Action, Lead, Campaign, Profile)\
         .join(Lead, Action.lead_id == Lead.id)\
         .outerjoin(Campaign, Action.campaign_id == Campaign.id)\
@@ -229,11 +190,10 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
         .filter(func.date(Action.performed_at) >= from_date)\
         .filter(func.date(Action.performed_at) <= to_date)\
         .order_by(Action.performed_at.desc())\
-        .limit(200).all()\
+        .limit(200).all()
     
     def clean_name(name):
         if not name: return "N/A"
-        # Убираем любые скобки [квадратные] и (круглые) и текст внутри них
         cleaned = re.sub(r'\s*[\[\(].*?[\]\)]', '', name)
         return cleaned.strip() or name
     
@@ -253,220 +213,51 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
 
 def get_campaign_sequence(db: Session, campaign_name: str):
     """
-    Dynamically reconstructs the campaign message sequence by analyzing past actions.
-    Normalizes messages into templates and identifies versions based on first appearance.
-    Tracks sent and reply counts for each template version.
+    Returns top message templates for a campaign (sent > 10), 
+    sorted by popularity.
     """
-    import re
-    from collections import defaultdict
-    from models import Action, Lead, Campaign
-
-    # 1. Get all relevant campaign IDs that share this cleaned name
+    # 1. Find campaign IDs that match the (already cleaned) name from frontend
     res = db.execute(text("""
         SELECT id FROM campaigns 
         WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
     """), {"name": campaign_name})
     campaign_ids = [row[0] for row in res]
     
-    if not campaign_ids: return []
+    if not campaign_ids:
+        res = db.execute(text("SELECT id FROM campaigns WHERE name = :name"), {"name": campaign_name})
+        campaign_ids = [row[0] for row in res]
+        if not campaign_ids: return []
 
-    profile_names = [row[0].split()[0] for row in db.execute(text("SELECT name FROM profiles")).all()]
-    profile_names.extend(['Nazar', 'Volodymyr', 'Svitlana'])
-    profile_names = list(set([n for n in profile_names if n]))
+    # 2. Query top templates (Sent > 10)
+    query = db.query(
+        MessageTemplate.id,
+        MessageTemplate.template,
+        MessageTemplate.step_index,
+        func.count(MessageTemplateMap.id).label('sent_count'),
+        func.count(MessageTemplateMap.id).filter(MessageTemplateMap.replied == True).label('reply_count'),
+        func.min(MessageTemplateMap.created_at).label('first_seen')
+    ).join(MessageTemplateMap, MessageTemplate.id == MessageTemplateMap.message_template_id)\
+     .filter(MessageTemplate.campaign_id.in_(campaign_ids))\
+     .group_by(MessageTemplate.id, MessageTemplate.template, MessageTemplate.step_index)\
+     .having(func.count(MessageTemplateMap.id) > 10)\
+     .order_by(func.count(MessageTemplateMap.id).desc())\
+     .all()
 
-    # 2. Get actions with lead info (including 'replied')
-    actions = db.query(Action, Lead)\
-        .join(Lead, Action.lead_id == Lead.id)\
-        .filter(Action.campaign_id.in_(campaign_ids))\
-        .filter(Action.action_type.in_(['invited', 'message sent', 'replied']))\
-        .order_by(Action.lead_id, Action.performed_at.asc())\
-        .all()
+    if not query:
+        return []
 
-    def normalize_company(company):
-        if not company: return ""
-        suffixes = r'\s+(Inc\.?|Ltd\.?|LLC|Corp\.?|Corporation|GmbH|S\.A\.?|PLC|S\.R\.L\.?|Holdings|Group)$'
-        clean = re.sub(suffixes, '', company, flags=re.I).strip()
-        clean = re.sub(r'\s*[\(\[].*?[\)\]]', '', clean).strip()
-        return clean
-
-    def normalize_name(first, last, handle, url):
-        variants = []
-        def extract_from_string(s):
-            if not s: return []
-            if '/' in s: s = s.split('/')[-1]
-            cleaned = re.sub(r'[-_\.]', ' ', s).strip()
-            parts = cleaned.split()
-            res = [cleaned] + [p for p in parts if len(p) > 2]
-            return [r for r in res if r and len(r) > 1]
-        
-        if first:
-            f_clean = re.sub(r'\s*[\(\[].*?[\)\]]', '', first).strip()
-            variants.append(first)
-            variants.append(f_clean)
-            if ' ' in f_clean: variants.append(f_clean.split()[0])
-        if last:
-            l_clean = re.sub(r'\s*[\(\[].*?[\)\]]', '', last).strip()
-            variants.append(last)
-            variants.append(l_clean)
-        if handle: variants.extend(extract_from_string(handle))
-        if url: variants.extend(extract_from_string(url))
-        if first and last:
-            f_c = re.sub(r'\s*[\(\[].*?[\)\]]', '', first).strip()
-            l_c = re.sub(r'\s*[\(\[].*?[\)\]]', '', last).strip()
-            variants.append(f"{f_c} {l_c}")
-            variants.append(f"{f_c} {l_c[0]}.")
-        return sorted(list(set([v for v in variants if v and len(v) > 1])), key=len, reverse=True)
-
-    def strip_signature(text, names):
-        closings = r'(Best regards|Regards|Best|Sincerely|Kind regards|Cheers|Thanks|Thank you|Best wishes|All the best|Warmly|Warm regards)'
-        lines = text.strip().split('\n')
-        if len(lines) < 2: return text
-        last_line = lines[-1].strip().strip(',.!')
-        is_name = any(last_line.lower() == n.lower() for n in names) or (len(last_line) <= 2 and last_line.isupper())
-        penultimate = lines[-2].strip().strip(',.!')
-        is_closing = re.match(rf'^{closings}$', penultimate, re.I)
-        if is_name and is_closing: return '\n'.join(lines[:-2]).strip()
-        if is_name and len(lines) > 2 and not lines[-2].strip(): return '\n'.join(lines[:-1]).strip()
-        return text
-
-    # 3. Group by lead
-    lead_sequences = defaultdict(list)
-    for action, lead in actions:
-        lead_sequences[lead.id].append((action, lead))
-
-    from difflib import SequenceMatcher
-    steps_data = defaultdict(list)
-    
-    # Cache for lead name variants to avoid redundant calls
-    name_variants_cache = {}
-
-    for lead_id, seq in lead_sequences.items():
-        # Get or compute name variants once per lead
-        if lead_id not in name_variants_cache:
-            lead = seq[0][1]
-            name_variants_cache[lead_id] = normalize_name(lead.first_name, lead.last_name, lead.linkedin_handle, lead.linkedin_url)
-        
-        name_variants = name_variants_cache[lead_id]
-        msgs_before_count = 0
-
-        for i, (action, lead) in enumerate(seq):
-            if action.action_type == 'replied': continue
-
-            # Determine step index
-            if i == 0 and action.action_type == 'invited':
-                current_step_idx = 0
-            elif action.action_type == 'message sent':
-                current_step_idx = msgs_before_count + 1
-                msgs_before_count += 1
-            else: continue
-
-            msg = action.message or ""
-            if not msg: continue
-
-            # Normalization (keeping original logic exactly as is)
-            normalized = msg.lstrip()
-            
-            # 1. Catch parenthetical patterns
-            if lead.first_name:
-                normalized = re.sub(rf'^{re.escape(lead.first_name)}\s*\([^)]*\)', lead.first_name, normalized, flags=re.I)
-            
-            # 2. Extract potential names
-            m_fb = re.search(r'\b(Hi|Hello|Hey|Greetings|Dear)\s+([A-Z][^?!:,\n]{1,25})\b', normalized, flags=re.I)
-            # Use local copy to avoid modifying cache
-            local_name_variants = list(name_variants)
-            if m_fb and m_fb.start() < 25: 
-                v_extracted = m_fb.group(2).strip()
-                if v_extracted not in local_name_variants:
-                    local_name_variants.append(v_extracted)
-            
-            m_fb_short = re.search(r'^([^?!:,\n]{1,20})\s*[?!.]{0,3}\s*[:;][\(\)DP]', normalized)
-            if m_fb_short:
-                v_extracted = m_fb_short.group(1).strip()
-                if v_extracted not in local_name_variants:
-                    local_name_variants.append(v_extracted)
-
-            # 3. Apply standard name replacement
-            for var in sorted(local_name_variants, key=len, reverse=True):
-                p_greet, p_title = r'Hi|Hello|Hey|Greetings|Dear', r'Dr\.?|Mr\.?|Ms\.?|Mrs\.?|Prof\.?'
-                pattern = rf'({p_greet})?\s*({p_title})?\s*\b{re.escape(var)}(\s*[\(\[].*?[\)\]])*(\s+[A-Z]\.?)*'
-                match = re.search(pattern, normalized, flags=re.I)
-                if match and match.start() < 30:
-                    start, end = match.span()
-                    punctuation = normalized[end] if end < len(normalized) and normalized[end] in ',!?.' else ""
-                    if punctuation: end += 1
-                    g, t = match.group(1) or "", match.group(2) or ""
-                    res = f"Hi {t} {{{{firstName}}}}{punctuation}" if g else f"{t} {{{{firstName}}}}{punctuation}"
-                    normalized = normalized[:start] + re.sub(r'\s+', ' ', res).strip() + normalized[end:]
-                    break 
-
-            # 4. Final safety cleanup
-            normalized = re.sub(r'^[A-Z][a-z\s]+\s*\(\{\{firstName\}\}\)', '{{firstName}}', normalized)
-
-            if lead.current_employer:
-                cleaned = normalize_company(lead.current_employer)
-                for var in sorted(list(set([lead.current_employer, cleaned])), key=len, reverse=True):
-                    if not var or len(var) < 3: continue
-                    normalized = re.sub(rf'{re.escape(var)}(\s*[\(\[].*?[\)\]])?', '{{companyName}}', normalized, flags=re.I)
-
-            normalized = strip_signature(normalized, profile_names)
-
-            # Comparison key
-            comp_key = re.sub(r'[^\x00-\x7F]+', '', normalized)
-            comp_key = re.sub(r'^[\s/ \-\._]+', '', comp_key)
-            comp_key = re.sub(r'\s+', ' ', comp_key).strip().lower()
-
-            # Outcome check
-            is_replied = (i + 1 < len(seq)) and (seq[i + 1][0].action_type == 'replied')
-
-            found_version = None
-            # Fast exact match check
-            for v in steps_data[current_step_idx]:
-                if v['_comp_key'] == comp_key:
-                    found_version = v
-                    break
-            
-            # Fuzzy match only if no exact match
-            if not found_version:
-                for v in steps_data[current_step_idx]:
-                    if abs(len(comp_key) - len(v['_comp_key'])) > 30: continue
-                    if SequenceMatcher(None, comp_key, v['_comp_key']).ratio() > 0.85:
-                        found_version = v
-                        break
-            
-            if found_version:
-                if action.performed_at < found_version['first_seen']:
-                    found_version['first_seen'] = action.performed_at
-                if action.performed_at > found_version['last_seen']:
-                    found_version['last_seen'], found_version['text'] = action.performed_at, normalized
-                found_version['sent_count'] += 1
-                if is_replied: found_version['reply_count'] += 1
-            else:
-                steps_data[current_step_idx].append({
-                    'text': normalized,
-                    '_comp_key': comp_key,
-                    'first_seen': action.performed_at,
-                    'last_seen': action.performed_at,
-                    'type': action.action_type,
-                    'sent_count': 1,
-                    'reply_count': 1 if is_replied else 0
-                })
-
-    # 4. Format
+    # 3. Format into a flat list
     result = []
-    for idx in sorted(steps_data.keys()):
-        versions_list = sorted(steps_data[idx], key=lambda x: x['last_seen'], reverse=True)
-        if not versions_list: continue
-        primary_type = versions_list[0]['type']
-        title = "Invitation" if primary_type == 'invited' else f"Message #{idx}"
-        formatted_versions = [{
-            "text": v['text'], 
-            "date": v['first_seen'].strftime("%d.%m.%Y"),
-            "sent_count": v['sent_count'],
-            "reply_count": v['reply_count']
-        } for v in versions_list]
+    for row in query:
+        is_invite = (row.step_index == 0)
         result.append({
-            "id": idx, "title": title,
-            "description": "Connection request step." if primary_type == 'invited' else f"Sequential follow-up message.",
-            "versions": formatted_versions
+            "id": row.id,
+            "title": "Invitation Template" if is_invite else f"Message Template (Step {row.step_index})",
+            "text": row.template,
+            "date": row.first_seen.strftime("%d.%m.%Y") if row.first_seen else "N/A",
+            "sent_count": row.sent_count,
+            "reply_count": row.reply_count,
+            "is_invite": is_invite
         })
+
     return result

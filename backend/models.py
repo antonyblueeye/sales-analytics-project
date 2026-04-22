@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, JSON, Boolean
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from database import Base
@@ -78,3 +78,29 @@ class Profile(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     campaigns = relationship("Campaign", back_populates="profile")
+
+class MessageTemplate(Base):
+    __tablename__ = "message_templates"
+
+    id = Column(Integer, primary_key=True, index=True)
+    template = Column(String, nullable=False)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    step_index = Column(Integer, nullable=False)  # 0 for invitation, 1+ for messages
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationship to the map
+    actions_map = relationship("MessageTemplateMap", back_populates="template")
+
+class MessageTemplateMap(Base):
+    __tablename__ = "message_templates_map"
+
+    id = Column(Integer, primary_key=True, index=True)
+    action_id = Column(Integer, ForeignKey("actions.id"), unique=True, nullable=False)
+    message_template_id = Column(Integer, ForeignKey("message_templates.id"), nullable=False)
+    replied = Column(Boolean, default=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    template = relationship("MessageTemplate", back_populates="actions_map")
+    action = relationship("Action")

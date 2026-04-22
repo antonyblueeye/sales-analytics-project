@@ -1,119 +1,179 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import CustomSelect from '../components/CustomSelect';
 import { 
-    ChevronLeft, 
-    ChevronRight, 
-    Clock, 
-    Plus,
     Loader2,
-    Target
+    Target,
+    MessageSquare,
+    Send,
+    BarChart3,
+    Trophy,
+    ExternalLink,
+    Clock
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 
-interface MessageVersion {
+interface Template {
+    id: number;
+    title: string;
     text: string;
     date: string;
     sent_count: number;
     reply_count: number;
+    is_invite: boolean;
 }
 
-interface Step {
-    id: number;
-    title: string;
-    description: string;
-    versions: MessageVersion[];
-}
+type SortCriterion = 'sent' | 'replies' | 'rate';
 
-const CampaignStep = ({ step, index }: { step: Step, index: number }) => {
-    const [versionIndex, setVersionIndex] = useState(0);
-    const currentVersion = step.versions[versionIndex];
-
-    const replyRate = currentVersion?.sent_count 
-        ? Math.round((currentVersion.reply_count / currentVersion.sent_count) * 100) 
+const TemplateCard = ({ 
+    template, 
+    rank, 
+    isSelected, 
+    onSelect 
+}: { 
+    template: Template, 
+    rank: number, 
+    isSelected: boolean, 
+    onSelect: () => void 
+}) => {
+    const replyRate = template.sent_count 
+        ? Math.round((template.reply_count / template.sent_count) * 100) 
         : 0;
 
     return (
-        <div className="relative pl-12 pb-12 group last:pb-0 font-sans">
-            <div className="absolute left-[23px] top-0 bottom-0 w-0.5 bg-slate-700 group-last:bg-transparent" />
-            <div className="absolute left-0 top-2 w-12 h-12 flex items-center justify-center">
-                <div className="w-4 h-4 rounded-full bg-indigo-500 border-4 border-slate-900 z-10 
-                              group-hover:scale-125 transition-transform duration-200 shadow-[0_0_15px_rgba(99,102,241,0.5)]" />
+        <motion.div 
+            layout="position"
+            key={template.id}
+            transition={{
+                type: "spring",
+                stiffness: 350,
+                damping: 30,
+                mass: 1
+            }}
+            onClick={onSelect}
+            className={`group relative border rounded-xl p-3 cursor-pointer transition-colors duration-300 ${
+                isSelected 
+                ? 'bg-indigo-500/10 border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.1)]' 
+                : 'bg-slate-800/30 border-slate-700/40 hover:border-slate-500/50 hover:bg-slate-800/50'
+            }`}
+        >
+            <div className={`absolute -top-2 -left-2 w-5 h-5 rounded bg-slate-900 border flex items-center justify-center text-[9px] font-bold transition-colors z-10 ${
+                isSelected ? 'border-indigo-500 text-indigo-400' : 'border-slate-700 text-slate-500'
+            }`}>
+                #{rank}
             </div>
-            <div className="bg-slate-800/50 border border-slate-700/50 rounded-2xl p-6 hover:border-indigo-500/30 transition-all duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest">Step {index + 1}</span>
-                        </div>
-                        <h3 className="text-xl font-semibold text-slate-100">{step.title}</h3>
-                        <p className="text-sm text-slate-400 mt-1">{step.description}</p>
-                    </div>
 
-                    {step.versions.length > 1 && (
-                        <div className="flex items-center gap-2 bg-slate-900/50 p-1.5 rounded-xl self-start border border-slate-700/30">
-                            <button 
-                                onClick={() => setVersionIndex(prev => Math.max(0, prev - 1))}
-                                disabled={versionIndex === 0}
-                                className="p-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-30 transition-colors text-slate-300"
-                            >
-                                <ChevronLeft size={16} />
-                            </button>
-                            <div className="px-3 text-xs font-bold text-slate-400 uppercase tracking-tighter">
-                                {step.versions.length - versionIndex} / {step.versions.length}
-                            </div>
-                            <button 
-                                onClick={() => setVersionIndex(prev => Math.min(step.versions.length - 1, prev + 1))}
-                                disabled={versionIndex === step.versions.length - 1}
-                                className="p-1.5 rounded-lg hover:bg-slate-800 disabled:opacity-30 transition-colors text-slate-300"
-                            >
-                                <ChevronRight size={16} />
-                            </button>
+            <div className="flex flex-col gap-2.5">
+                <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                            {template.is_invite ? (
+                                <span className="text-[8px] font-bold text-indigo-400 uppercase tracking-tighter">Invite</span>
+                            ) : (
+                                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Follow-up</span>
+                            )}
+                            <span className="text-[8px] text-slate-600 font-medium">{template.date}</span>
                         </div>
-                    )}
+                        <h3 className={`text-xs font-bold transition-colors line-clamp-1 ${
+                            isSelected ? 'text-white' : 'text-slate-200 group-hover:text-white'
+                        }`}>
+                            {template.title}
+                        </h3>
+                    </div>
                 </div>
 
-                <div className="relative mt-2">
-                    <div className="bg-slate-950/40 rounded-xl p-5 border border-slate-700/30 border-l-2 border-l-indigo-500/50 text-slate-300 leading-relaxed text-sm antialiased whitespace-pre-wrap">
-                        {currentVersion?.text}
+                <div className="relative overflow-hidden h-10 opacity-70">
+                    <div className="text-slate-400 text-[10px] leading-snug whitespace-pre-wrap line-clamp-3">
+                        {template.text}
                     </div>
-                    
-                    <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex items-center gap-6">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Sent</span>
-                                <div className="text-sm font-mono text-slate-300 bg-slate-900/60 px-3 py-1 rounded-lg border border-slate-700/30">
-                                    {currentVersion?.sent_count || 0}
-                                </div>
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Replies</span>
-                                <div className="text-sm font-mono text-emerald-400 bg-emerald-500/5 px-3 py-1 rounded-lg border border-emerald-500/20 flex items-center gap-2">
-                                    {currentVersion?.reply_count || 0}
-                                    <span className="text-[10px] text-emerald-500/50 font-sans font-bold">
-                                        {replyRate}%
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none" />
+                </div>
 
-                        <div className="text-[9px] uppercase font-bold tracking-[0.2em] text-slate-500 flex items-center gap-1.5 px-3 py-1 bg-slate-900/40 rounded-full border border-slate-700/30 self-end md:self-auto">
-                            <span className="w-1 h-1 rounded-full bg-indigo-500/70 animate-pulse"></span>
-                            Version from {currentVersion?.date}
+                <div className="flex items-center justify-between bg-slate-900/40 rounded-lg p-1.5 border border-slate-700/20">
+                    <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-1">
+                            <Send size={10} className="text-slate-500" />
+                            <span className="text-[10px] font-mono font-bold text-slate-300">{template.sent_count}</span>
+                        </div>
+                        <div className="flex items-center gap-1 border-l border-slate-700/50 pl-2.5">
+                            <MessageSquare size={10} className="text-emerald-500/70" />
+                            <span className="text-[10px] font-mono font-bold text-emerald-400/80">{template.reply_count}</span>
                         </div>
                     </div>
+                    <span className="text-[10px] font-mono font-bold text-emerald-400">{replyRate}%</span>
                 </div>
             </div>
-        </div>
+        </motion.div>
     );
 };
+
+const MessagePreview = ({ template }: { template: Template | null }) => {
+    if (!template) {
+        return (
+            <div className="h-full flex flex-col items-center justify-center p-8 text-center bg-slate-900/20 border border-dashed border-slate-800 rounded-xl">
+                <div className="w-10 h-10 rounded-full bg-slate-800/50 flex items-center justify-center mb-3 text-slate-700">
+                    <ExternalLink size={20} />
+                </div>
+                <h3 className="text-slate-500 font-bold text-xs uppercase tracking-widest">Select Template</h3>
+            </div>
+        );
+    }
+
+    return (
+        <motion.div 
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            key={template.id}
+            className="h-full bg-slate-900/60 border border-indigo-500/20 rounded-xl p-4 backdrop-blur-xl flex flex-col gap-4 sticky top-6 shadow-2xl"
+        >
+            <div className="flex flex-col gap-1">
+                <div className="flex items-center justify-between">
+                    <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-indigo-500/10 text-indigo-400 uppercase tracking-widest border border-indigo-500/20">
+                        {template.is_invite ? 'Invitation' : 'Sequential'}
+                    </span>
+                    <div className="flex items-center gap-1 text-slate-600">
+                        <Clock size={10} />
+                        <span className="text-[9px] font-bold uppercase">{template.date}</span>
+                    </div>
+                </div>
+                <h2 className="text-sm font-extrabold text-white truncate">{template.title}</h2>
+            </div>
+
+            <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-950/30 rounded-lg p-3 border border-slate-800/50">
+                <div className="text-slate-300 text-[11px] leading-relaxed whitespace-pre-wrap antialiased">
+                    {template.text}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 pt-3 border-t border-slate-800/50">
+                <div className="flex flex-col">
+                    <span className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">Sent</span>
+                    <span className="text-sm font-mono font-bold text-slate-300">{template.sent_count}</span>
+                </div>
+                <div className="flex flex-col border-l border-slate-800/50 pl-2">
+                    <span className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">Replies</span>
+                    <span className="text-sm font-mono font-bold text-emerald-500">{template.reply_count}</span>
+                </div>
+                <div className="flex flex-col border-l border-slate-800/50 pl-2">
+                    <span className="text-[8px] text-slate-600 uppercase font-bold tracking-tighter">Rate</span>
+                    <span className="text-sm font-mono font-bold text-indigo-400">
+                        {template.sent_count ? Math.round((template.reply_count / template.sent_count) * 100) : 0}%
+                    </span>
+                </div>
+            </div>
+        </motion.div>
+    );
+}
 
 export default function CampaignsPage() {
     const [campaigns, setCampaigns] = useState<string[]>([]);
     const [selectedCampaign, setSelectedCampaign] = useState<string>('');
-    const [sequence, setSequence] = useState<Step[]>([]);
+    const [templates, setTemplates] = useState<Template[]>([]);
+    const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
     const [loading, setLoading] = useState(true);
-    const [seqLoading, setSeqLoading] = useState(false);
+    const [dataLoading, setDataLoading] = useState(false);
+    const [sortBy, setSortBy] = useState<SortCriterion>('sent');
 
     React.useEffect(() => {
         const fetchCampaigns = async () => {
@@ -133,20 +193,34 @@ export default function CampaignsPage() {
     }, []);
 
     React.useEffect(() => {
-        const fetchSequence = async () => {
+        const fetchTemplates = async () => {
             if (!selectedCampaign) return;
-            setSeqLoading(true);
+            setDataLoading(true);
             try {
                 const response = await axios.get(`http://localhost:8000/analytics/campaign-sequence?campaign_name=${encodeURIComponent(selectedCampaign)}`);
-                setSequence(response.data);
+                setTemplates(response.data);
+                setSelectedTemplate(null);
             } catch (error) {
-                console.error('Error fetching sequence:', error);
+                console.error('Error fetching templates:', error);
             } finally {
-                setSeqLoading(false);
+                setDataLoading(false);
             }
         };
-        fetchSequence();
+        fetchTemplates();
     }, [selectedCampaign]);
+
+    const sortedTemplates = useMemo(() => {
+        return [...templates].sort((a, b) => {
+            if (sortBy === 'sent') return b.sent_count - a.sent_count;
+            if (sortBy === 'replies') return b.reply_count - a.reply_count;
+            if (sortBy === 'rate') {
+                const rateA = a.sent_count ? (a.reply_count / a.sent_count) : 0;
+                const rateB = b.sent_count ? (b.reply_count / b.sent_count) : 0;
+                return rateB - rateA;
+            }
+            return 0;
+        });
+    }, [templates, sortBy]);
 
     const campaignOptions = campaigns.map(name => ({ value: name, label: name }));
 
@@ -160,54 +234,86 @@ export default function CampaignsPage() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto py-8 px-4">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div className="max-w-[1600px] mx-auto py-6 px-6">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
                 <div className="flex-1">
-                    <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">Campaigns</h1>
-                    <p className="text-slate-400 text-lg">Browse outreach sequences and message variants.</p>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1">Top Templates</h1>
+                    <p className="text-slate-500 text-sm">Analyze and inspect your outreach message performance.</p>
                 </div>
 
-                <div className="w-full md:w-96 flex flex-col items-start md:items-end gap-2">
-                    <span className="text-[10px] uppercase font-bold tracking-widest text-slate-500 mr-1">Selected Campaign</span>
+                <div className="w-full md:w-80 flex flex-col items-end">
                     <CustomSelect 
                         value={selectedCampaign}
                         onChange={setSelectedCampaign}
                         options={campaignOptions}
                         placeholder="Select campaign"
-                        icon={<Target size={18} />}
+                        icon={<Target size={16} />}
                     />
                 </div>
             </div>
 
-            <div className="flex items-center gap-4 mb-8">
-                <div className="h-0.5 flex-1 bg-gradient-to-r from-transparent to-slate-700" />
-                <h2 className="text-sm font-bold text-slate-500 uppercase tracking-[0.2em] whitespace-nowrap">
-                    Message Sequence
-                </h2>
-                <div className="h-0.5 flex-1 bg-gradient-to-l from-transparent to-slate-700" />
-            </div>
-
-            <div className="space-y-0 min-h-[300px] transition-all duration-500">
-                {seqLoading ? (
-                    <div className="flex flex-col items-center justify-center p-20 text-slate-500 gap-4">
-                        <Loader2 size={32} className="animate-spin text-indigo-500/50" />
-                        <p className="text-sm font-medium animate-pulse">Reconstructing sequence...</p>
-                    </div>
-                ) : sequence.length > 0 ? (
-                    sequence.map((step, idx) => (
-                        <CampaignStep key={step.id} step={step} index={idx} />
-                    ))
-                ) : (
-                    <div className="flex flex-col items-center justify-center p-20 text-center bg-slate-900/20 border border-dashed border-slate-700/50 rounded-3xl">
-                        <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 text-slate-600">
-                            <Target size={32} />
+            <div className="grid grid-cols-12 gap-6 items-start">
+                <div className="col-span-12 lg:col-span-8">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div className="flex items-center gap-2">
+                            <div className="h-4 w-1 bg-indigo-500 rounded-full" />
+                            <h2 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                Ranking Results
+                            </h2>
                         </div>
-                        <h3 className="text-lg font-bold text-slate-300">No sequence detected</h3>
-                        <p className="text-sm text-slate-500 max-w-xs mt-2">
-                            We couldn't reconstruct the sequence templates from the existing action logs for this campaign.
-                        </p>
+
+                        <div className="flex items-center bg-slate-900/50 p-1 rounded-lg border border-slate-700/30">
+                            <button 
+                                onClick={() => setSortBy('sent')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${sortBy === 'sent' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                SENT
+                            </button>
+                            <button 
+                                onClick={() => setSortBy('replies')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${sortBy === 'replies' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                REPLIES
+                            </button>
+                            <button 
+                                onClick={() => setSortBy('rate')}
+                                className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[9px] font-bold transition-all ${sortBy === 'rate' ? 'bg-indigo-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}
+                            >
+                                RATE
+                            </button>
+                        </div>
                     </div>
-                )}
+
+                    <div className="min-h-[500px]">
+                        {dataLoading ? (
+                            <div className="flex flex-col items-center justify-center p-20 text-slate-500 gap-4">
+                                <Loader2 size={32} className="animate-spin text-indigo-500/50" />
+                                <p className="text-sm font-medium animate-pulse">Analyzing metrics...</p>
+                            </div>
+                        ) : sortedTemplates.length > 0 ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                                {sortedTemplates.map((tpl, idx) => (
+                                    <TemplateCard 
+                                        key={tpl.id} 
+                                        template={tpl} 
+                                        rank={idx + 1} 
+                                        isSelected={selectedTemplate?.id === tpl.id}
+                                        onSelect={() => setSelectedTemplate(tpl)}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center p-20 text-center bg-slate-900/10 border border-dashed border-slate-800 rounded-xl">
+                                <Target size={24} className="text-slate-700 mb-2" />
+                                <h3 className="text-xs font-bold text-slate-500">No data found</h3>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                <div className="col-span-12 lg:col-span-4 h-[calc(100vh-350px)] min-h-[400px] sticky top-6">
+                    <MessagePreview template={selectedTemplate} />
+                </div>
             </div>
         </div>
     );
