@@ -14,6 +14,8 @@ import axios from 'axios';
 interface MessageVersion {
     text: string;
     date: string;
+    sent_count: number;
+    reply_count: number;
 }
 
 interface Step {
@@ -26,6 +28,10 @@ interface Step {
 const CampaignStep = ({ step, index }: { step: Step, index: number }) => {
     const [versionIndex, setVersionIndex] = useState(0);
     const currentVersion = step.versions[versionIndex];
+
+    const replyRate = currentVersion?.sent_count 
+        ? Math.round((currentVersion.reply_count / currentVersion.sent_count) * 100) 
+        : 0;
 
     return (
         <div className="relative pl-12 pb-12 group last:pb-0 font-sans">
@@ -72,8 +78,26 @@ const CampaignStep = ({ step, index }: { step: Step, index: number }) => {
                         {currentVersion?.text}
                     </div>
                     
-                    <div className="mt-3 flex items-center justify-end">
-                        <div className="text-[9px] uppercase font-bold tracking-[0.2em] text-slate-500 flex items-center gap-1.5 px-3 py-1 bg-slate-900/40 rounded-full border border-slate-700/30">
+                    <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-6">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Sent</span>
+                                <div className="text-sm font-mono text-slate-300 bg-slate-900/60 px-3 py-1 rounded-lg border border-slate-700/30">
+                                    {currentVersion?.sent_count || 0}
+                                </div>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-1">Replies</span>
+                                <div className="text-sm font-mono text-emerald-400 bg-emerald-500/5 px-3 py-1 rounded-lg border border-emerald-500/20 flex items-center gap-2">
+                                    {currentVersion?.reply_count || 0}
+                                    <span className="text-[10px] text-emerald-500/50 font-sans font-bold">
+                                        {replyRate}%
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="text-[9px] uppercase font-bold tracking-[0.2em] text-slate-500 flex items-center gap-1.5 px-3 py-1 bg-slate-900/40 rounded-full border border-slate-700/30 self-end md:self-auto">
                             <span className="w-1 h-1 rounded-full bg-indigo-500/70 animate-pulse"></span>
                             Version from {currentVersion?.date}
                         </div>
