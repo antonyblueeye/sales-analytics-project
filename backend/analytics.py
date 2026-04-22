@@ -336,8 +336,19 @@ def get_campaign_sequence(db: Session, campaign_name: str):
 
     from difflib import SequenceMatcher
     steps_data = defaultdict(list)
+    
+    # Cache for lead name variants to avoid redundant calls
+    name_variants_cache = {}
 
     for lead_id, seq in lead_sequences.items():
+        # Get or compute name variants once per lead
+        if lead_id not in name_variants_cache:
+            lead = seq[0][1]
+            name_variants_cache[lead_id] = normalize_name(lead.first_name, lead.last_name, lead.linkedin_handle, lead.linkedin_url)
+        
+        name_variants = name_variants_cache[lead_id]
+        msgs_before_count = 0
+
         for i, (action, lead) in enumerate(seq):
             if action.action_type == 'replied': continue
 
@@ -345,49 +356,50 @@ def get_campaign_sequence(db: Session, campaign_name: str):
             if i == 0 and action.action_type == 'invited':
                 current_step_idx = 0
             elif action.action_type == 'message sent':
-                has_start_invite = seq[0][0].action_type == 'invited'
-                msgs_before = sum(1 for prev_a, _ in seq[:i] if prev_a.action_type == 'message sent')
-                current_step_idx = msgs_before + (1 if has_start_invite else 0)
+                current_step_idx = msgs_before_count + 1
+                msgs_before_count += 1
             else: continue
 
             msg = action.message or ""
             if not msg: continue
 
-            # Normalization
+            # Normalization (keeping original logic exactly as is)
             normalized = msg.lstrip()
-            name_variants = normalize_name(lead.first_name, lead.last_name, lead.linkedin_handle, lead.linkedin_url)
             
-            # 1. Catch parenthetical patterns early (like "John ({{firstName}})" or "John (John Doe)")
-            # This handles cases where partial normalization or weird DB data exists
+            # 1. Catch parenthetical patterns
             if lead.first_name:
                 normalized = re.sub(rf'^{re.escape(lead.first_name)}\s*\([^)]*\)', lead.first_name, normalized, flags=re.I)
             
-            # 2. Extract potential names from greetings or short patterns
+            # 2. Extract potential names
             m_fb = re.search(r'\b(Hi|Hello|Hey|Greetings|Dear)\s+([A-Z][^?!:,\n]{1,25})\b', normalized, flags=re.I)
-            if m_fb and m_fb.start() < 25: name_variants.append(m_fb.group(2).strip())
+            # Use local copy to avoid modifying cache
+            local_name_variants = list(name_variants)
+            if m_fb and m_fb.start() < 25: 
+                v_extracted = m_fb.group(2).strip()
+                if v_extracted not in local_name_variants:
+                    local_name_variants.append(v_extracted)
             
-            # Improved short pattern detection: Name followed by optional punctuation and a smiley
             m_fb_short = re.search(r'^([^?!:,\n]{1,20})\s*[?!.]{0,3}\s*[:;][\(\)DP]', normalized)
-            if m_fb_short: name_variants.append(m_fb_short.group(1).strip())
+            if m_fb_short:
+                v_extracted = m_fb_short.group(1).strip()
+                if v_extracted not in local_name_variants:
+                    local_name_variants.append(v_extracted)
 
             # 3. Apply standard name replacement
-            for var in sorted(list(set([v for v in name_variants if v])), key=len, reverse=True):
+            for var in sorted(local_name_variants, key=len, reverse=True):
                 p_greet, p_title = r'Hi|Hello|Hey|Greetings|Dear', r'Dr\.?|Mr\.?|Ms\.?|Mrs\.?|Prof\.?'
-                # This pattern matches Greeting? Title? Name (Optional Parentheses Content) (Optional Initials)
                 pattern = rf'({p_greet})?\s*({p_title})?\s*\b{re.escape(var)}(\s*[\(\[].*?[\)\]])*(\s+[A-Z]\.?)*'
                 match = re.search(pattern, normalized, flags=re.I)
                 if match and match.start() < 30:
                     start, end = match.span()
-                    # Check for trailing punctuation
                     punctuation = normalized[end] if end < len(normalized) and normalized[end] in ',!?.' else ""
                     if punctuation: end += 1
                     g, t = match.group(1) or "", match.group(2) or ""
-                    # Standardize everything to "Hi {{firstName}}" or just "{{firstName}}"
                     res = f"Hi {t} {{{{firstName}}}}{punctuation}" if g else f"{t} {{{{firstName}}}}{punctuation}"
                     normalized = normalized[:start] + re.sub(r'\s+', ' ', res).strip() + normalized[end:]
                     break 
 
-            # 4. Final safety cleanup for any leftover "John ({{firstName}})" artifacts
+            # 4. Final safety cleanup
             normalized = re.sub(r'^[A-Z][a-z\s]+\s*\(\{\{firstName\}\}\)', '{{firstName}}', normalized)
 
             if lead.current_employer:
@@ -398,8 +410,7 @@ def get_campaign_sequence(db: Session, campaign_name: str):
 
             normalized = strip_signature(normalized, profile_names)
 
-
-
+            # Comparison key
             comp_key = re.sub(r'[^\x00-\x7F]+', '', normalized)
             comp_key = re.sub(r'^[\s/ \-\._]+', '', comp_key)
             comp_key = re.sub(r'\s+', ' ', comp_key).strip().lower()
@@ -408,13 +419,19 @@ def get_campaign_sequence(db: Session, campaign_name: str):
             is_replied = (i + 1 < len(seq)) and (seq[i + 1][0].action_type == 'replied')
 
             found_version = None
+            # Fast exact match check
             for v in steps_data[current_step_idx]:
-                v_comp = re.sub(r'[^\x00-\x7F]+', '', v['text'])
-                v_comp = re.sub(r'^[\s/ \-\._]+', '', v_comp)
-                v_comp = re.sub(r'\s+', ' ', v_comp).strip().lower()
-                if SequenceMatcher(None, comp_key, v_comp).ratio() > 0.85:
+                if v['_comp_key'] == comp_key:
                     found_version = v
                     break
+            
+            # Fuzzy match only if no exact match
+            if not found_version:
+                for v in steps_data[current_step_idx]:
+                    if abs(len(comp_key) - len(v['_comp_key'])) > 30: continue
+                    if SequenceMatcher(None, comp_key, v['_comp_key']).ratio() > 0.85:
+                        found_version = v
+                        break
             
             if found_version:
                 if action.performed_at < found_version['first_seen']:
@@ -426,6 +443,7 @@ def get_campaign_sequence(db: Session, campaign_name: str):
             else:
                 steps_data[current_step_idx].append({
                     'text': normalized,
+                    '_comp_key': comp_key,
                     'first_seen': action.performed_at,
                     'last_seen': action.performed_at,
                     'type': action.action_type,
@@ -435,12 +453,11 @@ def get_campaign_sequence(db: Session, campaign_name: str):
 
     # 4. Format
     result = []
-    has_invitation = 0 in steps_data and any(v['type'] == 'invited' for v in steps_data[0])
     for idx in sorted(steps_data.keys()):
         versions_list = sorted(steps_data[idx], key=lambda x: x['last_seen'], reverse=True)
         if not versions_list: continue
         primary_type = versions_list[0]['type']
-        title = "Invitation" if primary_type == 'invited' else f"Message #{idx if has_invitation else idx + 1}"
+        title = "Invitation" if primary_type == 'invited' else f"Message #{idx}"
         formatted_versions = [{
             "text": v['text'], 
             "date": v['first_seen'].strftime("%d.%m.%Y"),
