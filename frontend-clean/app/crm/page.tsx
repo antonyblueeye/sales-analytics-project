@@ -417,6 +417,8 @@ export default function CRMPage() {
     const logCampaignRef = useRef<HTMLDivElement>(null);
     const [isLogActivityTypeOpen, setIsLogActivityTypeOpen] = useState(false);
     const logActivityTypeRef = useRef<HTMLDivElement>(null);
+    const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
+    const statusFilterRef = useRef<HTMLDivElement>(null);
 
     const [allProfiles, setAllProfiles] = useState<string[]>([]);
     const [allCampaigns, setAllCampaigns] = useState<string[]>([]);
@@ -564,6 +566,9 @@ export default function CRMPage() {
             }
             if (logActivityTypeRef.current && !logActivityTypeRef.current.contains(target)) {
                 setIsLogActivityTypeOpen(false);
+            }
+            if (statusFilterRef.current && !statusFilterRef.current.contains(target)) {
+                setIsStatusFilterOpen(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -829,105 +834,141 @@ export default function CRMPage() {
                     </div>
                 </div>
 
-                {showFilters && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3 p-4 bg-slate-800/50 border border-slate-700 rounded-xl animate-in fade-in slide-in-from-top-2">
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">First Name</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                                value={filterFirstName}
-                                onChange={(e) => setFilterFirstName(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">Last Name</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                                value={filterLastName}
-                                onChange={(e) => setFilterLastName(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">Campaign</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                                value={filterCampaign}
-                                onChange={(e) => setFilterCampaign(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">Status</label>
-                            <select
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-200"
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                            >
-                                <option value="">All Statuses</option>
-                                <option value="New">New</option>
-                                <option value="Connected">Connected</option>
-                                <option value="Replied">Replied</option>
-                                <option value="interested">Interested</option>
-                                <option value="call">Call</option>
-                                <option value="mql">MQL</option>
-                                <option value="sql">SQL</option>
-                                <option value="partner">Partner</option>
-                                <option value="client">Client</option>
-                            </select>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">Position</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                                value={filterPosition}
-                                onChange={(e) => setFilterPosition(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">Company</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                                value={filterCompany}
-                                onChange={(e) => setFilterCompany(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1">
-                            <label className="text-xs text-slate-400 font-medium ml-1">Location</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
-                                value={filterLocation}
-                                onChange={(e) => setFilterLocation(e.target.value)}
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Created At</label>
-                            <DateRangePickerButton
-                                range={filterCreateDate}
-                                onSelect={setFilterCreateDate}
-                                label="All time"
-                            />
-                        </div>
-                        <div className="flex flex-col gap-1.5">
-                            <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Last Activity</label>
-                            <DateRangePickerButton
-                                range={filterActivityDate}
-                                onSelect={setFilterActivityDate}
-                                label="All time"
-                            />
+                <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${showFilters ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0 pointer-events-none'}`}>
+                    <div className="overflow-visible min-h-0">
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3 p-4 bg-slate-800/50 border border-slate-700 rounded-xl">
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-400 font-medium ml-1">First Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="Filter..."
+                                    className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={filterFirstName}
+                                    onChange={(e) => setFilterFirstName(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-400 font-medium ml-1">Last Name</label>
+                                <input
+                                    type="text"
+                                    placeholder="Filter..."
+                                    className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={filterLastName}
+                                    onChange={(e) => setFilterLastName(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-400 font-medium ml-1">Campaign</label>
+                                <input
+                                    type="text"
+                                    placeholder="Filter..."
+                                    className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={filterCampaign}
+                                    onChange={(e) => setFilterCampaign(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1" ref={statusFilterRef}>
+                                <label className="text-xs text-slate-400 font-medium ml-1">Status</label>
+                                <div className="relative">
+                                    <button
+                                        onClick={() => setIsStatusFilterOpen(!isStatusFilterOpen)}
+                                        className={`w-full flex items-center justify-between bg-slate-900 border rounded-md px-3 py-1.5 text-xs transition-all outline-none ${isStatusFilterOpen ? 'border-indigo-500' : 'border-slate-700 hover:border-slate-500'}`}
+                                    >
+                                        <span className="text-slate-200 truncate">
+                                            {[
+                                                { value: '', label: 'All Statuses' },
+                                                { value: 'New', label: 'New' },
+                                                { value: 'Connected', label: 'Connected' },
+                                                { value: 'Replied', label: 'Replied' },
+                                                { value: 'interested', label: 'Interested' },
+                                                { value: 'call', label: 'Call' },
+                                                { value: 'mql', label: 'MQL' },
+                                                { value: 'sql', label: 'SQL' },
+                                                { value: 'partner', label: 'Partner' },
+                                                { value: 'client', label: 'Client' }
+                                            ].find(o => o.value === filterStatus)?.label || 'All Statuses'}
+                                        </span>
+                                        <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform duration-200 ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
+                                    </button>
+
+                                    {isStatusFilterOpen && (
+                                        <div className="absolute left-0 mt-1 w-full bg-slate-900 border border-slate-700 shadow-xl z-[110] py-1 rounded-lg overflow-y-auto max-h-[200px] animate-in fade-in slide-in-from-top-1 duration-200 custom-scrollbar">
+                                            {[
+                                                { value: '', label: 'All Statuses' },
+                                                { value: 'New', label: 'New' },
+                                                { value: 'Connected', label: 'Connected' },
+                                                { value: 'Replied', label: 'Replied' },
+                                                { value: 'interested', label: 'Interested' },
+                                                { value: 'call', label: 'Call' },
+                                                { value: 'mql', label: 'MQL' },
+                                                { value: 'sql', label: 'SQL' },
+                                                { value: 'partner', label: 'Partner' },
+                                                { value: 'client', label: 'Client' }
+                                            ].map(option => (
+                                                <button
+                                                    key={option.value}
+                                                    onClick={() => {
+                                                        setFilterStatus(option.value);
+                                                        setIsStatusFilterOpen(false);
+                                                    }}
+                                                    className={`w-full text-left px-3 py-1.5 text-xs transition-all ${filterStatus === option.value ? 'bg-indigo-500/20 text-indigo-400 font-bold' : 'text-slate-300 hover:bg-slate-800'}`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-400 font-medium ml-1">Position</label>
+                                <input
+                                    type="text"
+                                    placeholder="Filter..."
+                                    className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={filterPosition}
+                                    onChange={(e) => setFilterPosition(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-400 font-medium ml-1">Company</label>
+                                <input
+                                    type="text"
+                                    placeholder="Filter..."
+                                    className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={filterCompany}
+                                    onChange={(e) => setFilterCompany(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-400 font-medium ml-1">Location</label>
+                                <input
+                                    type="text"
+                                    placeholder="Filter..."
+                                    className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                                    value={filterLocation}
+                                    onChange={(e) => setFilterLocation(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Created At</label>
+                                <DateRangePickerButton
+                                    range={filterCreateDate}
+                                    onSelect={setFilterCreateDate}
+                                    label="All time"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] uppercase font-bold text-slate-500 ml-1">Last Activity</label>
+                                <DateRangePickerButton
+                                    range={filterActivityDate}
+                                    onSelect={setFilterActivityDate}
+                                    label="All time"
+                                />
+                            </div>
                         </div>
                     </div>
-                )}
+                </div>
             </div>
 
             {/* List Content */}
