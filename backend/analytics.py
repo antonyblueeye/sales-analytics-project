@@ -214,7 +214,7 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
 def get_campaign_sequence(db: Session, campaign_name: str):
     """
     Returns top message templates for a campaign (sent > 10), 
-    sorted by popularity.
+    aggregated by template text across all sequence steps.
     """
     # 1. Find campaign IDs that match the (already cleaned) name from frontend
     res = db.execute(text("""
@@ -228,17 +228,17 @@ def get_campaign_sequence(db: Session, campaign_name: str):
         campaign_ids = [row[0] for row in res]
         if not campaign_ids: return []
 
-    # 2. Query top templates (Sent > 10)
+    # 2. Query top templates (Sent > 10), grouping by the template text itself
     query = db.query(
-        MessageTemplate.id,
         MessageTemplate.template,
-        MessageTemplate.step_index,
+        func.min(MessageTemplate.id).label('representative_id'),
+        func.min(MessageTemplate.step_index).label('min_step'),
         func.count(MessageTemplateMap.id).label('sent_count'),
         func.count(MessageTemplateMap.id).filter(MessageTemplateMap.replied == True).label('reply_count'),
         func.min(MessageTemplateMap.created_at).label('first_seen')
     ).join(MessageTemplateMap, MessageTemplate.id == MessageTemplateMap.message_template_id)\
      .filter(MessageTemplate.campaign_id.in_(campaign_ids))\
-     .group_by(MessageTemplate.id, MessageTemplate.template, MessageTemplate.step_index)\
+     .group_by(MessageTemplate.template)\
      .having(func.count(MessageTemplateMap.id) > 10)\
      .order_by(func.count(MessageTemplateMap.id).desc())\
      .all()
@@ -249,10 +249,13 @@ def get_campaign_sequence(db: Session, campaign_name: str):
     # 3. Format into a flat list
     result = []
     for row in query:
-        is_invite = (row.step_index == 0)
+        is_invite = (row.min_step == 0)
+        # Using a generic title if it's found at multiple steps, or "Invitation" if it's used as one
+        title = "Invitation Template" if is_invite else "Outreach Message"
+        
         result.append({
-            "id": row.id,
-            "title": "Invitation Template" if is_invite else f"Message Template (Step {row.step_index})",
+            "id": row.representative_id,
+            "title": title,
             "text": row.template,
             "date": row.first_seen.strftime("%d.%m.%Y") if row.first_seen else "N/A",
             "sent_count": row.sent_count,
