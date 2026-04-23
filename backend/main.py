@@ -172,6 +172,8 @@ def crm_leads(
     create_date_to: Optional[str] = None,
     activity_date_from: Optional[str] = None,
     activity_date_to: Optional[str] = None,
+    campaign: Optional[str] = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     data = get_leads_list(
@@ -179,7 +181,8 @@ def crm_leads(
         first_name, last_name, company,
         location, title,
         create_date_from, create_date_to,
-        activity_date_from, activity_date_to
+        activity_date_from, activity_date_to,
+        campaign, status
     )
     return data
 
@@ -197,6 +200,8 @@ def crm_replied_leads(
     create_date_to: Optional[str] = None,
     activity_date_from: Optional[str] = None,
     activity_date_to: Optional[str] = None,
+    campaign: Optional[str] = None,
+    status: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     data = get_replied_leads(
@@ -204,7 +209,8 @@ def crm_replied_leads(
         first_name, last_name, company,
         location, title,
         create_date_from, create_date_to,
-        activity_date_from, activity_date_to
+        activity_date_from, activity_date_to,
+        campaign, status
     )
     return data
 
@@ -214,6 +220,32 @@ def crm_lead_activities(
     db: Session = Depends(get_db)
 ):
     return get_lead_activities(db, lead_id)
+
+from pydantic import BaseModel
+
+class ActivityCreate(BaseModel):
+    type: str
+    message: str
+    date: str
+    campaign_name: str
+    profile_name: str
+
+@app.post("/crm/leads/{lead_id}/activities")
+def create_lead_activity(
+    lead_id: int,
+    activity: ActivityCreate,
+    db: Session = Depends(get_db)
+):
+    from crm import add_lead_activity
+    return add_lead_activity(db, lead_id, activity)
+
+@app.delete("/crm/activities/{activity_id}")
+def delete_activity(
+    activity_id: int,
+    db: Session = Depends(get_db)
+):
+    from crm import remove_activity
+    return remove_activity(db, activity_id)
 
 @app.get("/analytics/campaigns-list")
 def campaigns_list(db: Session = Depends(get_db)):

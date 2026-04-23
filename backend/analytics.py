@@ -42,7 +42,13 @@ def get_profiles_summary(db: Session, from_date: date, to_date: date):
             ROUND(
                 COUNT(*) FILTER (WHERE a.action_type = 'replied')::NUMERIC / 
                 NULLIF(COUNT(*) FILTER (WHERE a.action_type = 'message sent'), 0) * 100, 2
-            ) AS reply_rate
+            ) AS reply_rate,
+            COUNT(*) FILTER (WHERE a.action_type = 'interested') AS interested,
+            COUNT(*) FILTER (WHERE a.action_type = 'call') AS calls,
+            COUNT(*) FILTER (WHERE a.action_type = 'mql') AS mql,
+            COUNT(*) FILTER (WHERE a.action_type = 'sql') AS sql,
+            COUNT(*) FILTER (WHERE a.action_type = 'partner') AS partner,
+            COUNT(*) FILTER (WHERE a.action_type = 'client') AS clients
         FROM actions a
         LEFT JOIN profiles p ON a.profile_id = p.id
         WHERE a.performed_at >= :from_date AND a.performed_at < :next_day
@@ -58,7 +64,13 @@ def get_profiles_summary(db: Session, from_date: date, to_date: date):
             "acceptance_rate": row.acceptance_rate,
             "messaged": row.messaged,
             "replied": row.replied,
-            "reply_rate": row.reply_rate
+            "reply_rate": row.reply_rate,
+            "interested": row.interested,
+            "calls": row.calls,
+            "mql": row.mql,
+            "sql": row.sql,
+            "partner": row.partner,
+            "clients": row.clients
         }
         for row in result
     ]
@@ -86,7 +98,13 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
             coalesce(round(
                 count(*) filter (where a.action_type = 'replied')::numeric / 
                 nullif(count(*) filter (where a.action_type = 'message sent'), 0) * 100, 2
-            ), 0) as reply_rate
+            ), 0) as reply_rate,
+            count(*) filter (where a.action_type = 'interested') as interested,
+            count(*) filter (where a.action_type = 'call') as calls,
+            count(*) filter (where a.action_type = 'mql') as mql,
+            count(*) filter (where a.action_type = 'sql') as sql,
+            count(*) filter (where a.action_type = 'partner') as partner,
+            count(*) filter (where a.action_type = 'client') as clients
         from actions a
         left join clean_campaigns cc on a.campaign_id = cc.id
         left join profiles p on a.profile_id = p.id
@@ -104,7 +122,13 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
             "acceptance_rate": row.acceptance_rate,
             "messaged": row.messaged,
             "replied": row.replied,
-            "reply_rate": row.reply_rate
+            "reply_rate": row.reply_rate,
+            "interested": row.interested,
+            "calls": row.calls,
+            "mql": row.mql,
+            "sql": row.sql,
+            "partner": row.partner,
+            "clients": row.clients
         }
         for row in result
     ]

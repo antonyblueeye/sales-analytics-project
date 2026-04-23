@@ -216,6 +216,8 @@ export default function CampaignsPage() {
     }, []);
 
     React.useEffect(() => {
+        let isActive = true;
+
         const fetchTemplates = async () => {
             if (!isGlobal && !selectedCampaign) return;
             setDataLoading(true);
@@ -224,15 +226,26 @@ export default function CampaignsPage() {
                     ? 'http://localhost:8000/analytics/campaign-sequence?campaign_name=ALL_CAMPAIGNS'
                     : `http://localhost:8000/analytics/campaign-sequence?campaign_name=${encodeURIComponent(selectedCampaign)}`;
                 const response = await axios.get(url);
-                setTemplates(response.data);
-                setSelectedTemplate(null);
+                
+                if (isActive) {
+                    setTemplates(response.data);
+                    setSelectedTemplate(prev => {
+                        if (!prev) return null;
+                        const updated = response.data.find((t: Template) => t.id === prev.id);
+                        return updated || null;
+                    });
+                }
             } catch (error) {
-                console.error('Error fetching templates:', error);
+                if (isActive) console.error('Error fetching templates:', error);
             } finally {
-                setDataLoading(false);
+                if (isActive) setDataLoading(false);
             }
         };
         fetchTemplates();
+
+        return () => {
+            isActive = false;
+        };
     }, [selectedCampaign, isGlobal]);
 
     const sortedTemplates = useMemo(() => {

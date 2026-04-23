@@ -193,12 +193,12 @@ export default function Dashboard() {
             messages: c.messaged || 0,
             replies: c.replied || 0,
             replyRate: c.reply_rate || 0,
-            interested: 'N/A',
-            calls: 'N/A',
-            mql: 'N/A',
-            sql: 'N/A',
-            partner: 'N/A',
-            clients: 'N/A'
+            interested: c.interested || 0,
+            calls: c.calls || 0,
+            mql: c.mql || 0,
+            sql: c.sql || 0,
+            partner: c.partner || 0,
+            clients: c.clients || 0
           });
         });
         return map;
@@ -215,12 +215,12 @@ export default function Dashboard() {
         messages: item.messaged || 0,
         replies: item.replied || 0,
         replyRate: item.reply_rate || 0,
-        interested: 'N/A',
-        calls: 'N/A',
-        mql: 'N/A',
-        sql: 'N/A',
-        partner: 'N/A',
-        clients: 'N/A',
+        interested: item.interested || 0,
+        calls: item.calls || 0,
+        mql: item.mql || 0,
+        sql: item.sql || 0,
+        partner: item.partner || 0,
+        clients: item.clients || 0,
         campaigns: campaignsMap[item.profile_name] || []
       });
 
@@ -247,6 +247,12 @@ export default function Dashboard() {
       acc.accepted += curr.accepted;
       acc.messages += curr.messages;
       acc.replies += curr.replies;
+      acc.interested += Number(curr.interested) || 0;
+      acc.calls += Number(curr.calls) || 0;
+      acc.mql += Number(curr.mql) || 0;
+      acc.sql += Number(curr.sql) || 0;
+      acc.partner += Number(curr.partner) || 0;
+      acc.clients += Number(curr.clients) || 0;
       return acc;
     }, { invites: 0, accepted: 0, messages: 0, replies: 0, interested: 0, calls: 0, mql: 0, sql: 0, partner: 0, clients: 0 });
 
@@ -276,13 +282,25 @@ export default function Dashboard() {
             invites: 0,
             accepted: 0,
             messages: 0,
-            replies: 0
+            replies: 0,
+            interested: 0,
+            calls: 0,
+            mql: 0,
+            sql: 0,
+            partner: 0,
+            clients: 0
           };
         }
         ctMap[c.name].invites += (c.invites || 0);
         ctMap[c.name].accepted += (c.accepted || 0);
         ctMap[c.name].messages += (c.messages || 0);
         ctMap[c.name].replies += (c.replies || 0);
+        ctMap[c.name].interested += (c.interested || 0);
+        ctMap[c.name].calls += (c.calls || 0);
+        ctMap[c.name].mql += (c.mql || 0);
+        ctMap[c.name].sql += (c.sql || 0);
+        ctMap[c.name].partner += (c.partner || 0);
+        ctMap[c.name].clients += (c.clients || 0);
       });
     });
     const ct = Object.values(ctMap);
@@ -444,12 +462,12 @@ export default function Dashboard() {
                       <StatCell value={profile.replyRate} previousValue={prevProfile?.replyRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-indigo-400 bg-indigo-400/5 rounded-md my-1" rowIndex={idx} />
 
                       {/* Placeholder stats (interested, calls, etc.) */}
-                      <StatCell value={profile.interested} previousValue={0} startDate={startDate} endDate={endDate} rowIndex={idx} />
-                      <StatCell value={profile.calls} previousValue={0} startDate={startDate} endDate={endDate} rowIndex={idx} />
-                      <StatCell value={profile.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={idx} />
-                      <StatCell value={profile.sql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-orange-300" rowIndex={idx} />
-                      <StatCell value={profile.partner} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-rose-300" rowIndex={idx} />
-                      <StatCell value={profile.clients} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-emerald-400 font-bold" rowIndex={idx} />
+                      <StatCell value={profile.interested} previousValue={prevProfile?.interested || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.calls} previousValue={prevProfile?.calls || 0} startDate={startDate} endDate={endDate} rowIndex={idx} />
+                      <StatCell value={profile.mql} previousValue={prevProfile?.mql || 0} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={idx} />
+                      <StatCell value={profile.sql} previousValue={prevProfile?.sql || 0} startDate={startDate} endDate={endDate} customClass="text-orange-300" rowIndex={idx} />
+                      <StatCell value={profile.partner} previousValue={prevProfile?.partner || 0} startDate={startDate} endDate={endDate} customClass="text-rose-300" rowIndex={idx} />
+                      <StatCell value={profile.clients} previousValue={prevProfile?.clients || 0} startDate={startDate} endDate={endDate} customClass="text-emerald-400 font-bold" rowIndex={idx} />
                     </tr>
 
                     {/* Развернутые строки (кампании) */}
@@ -474,12 +492,12 @@ export default function Dashboard() {
                           <StatCell value={camp.replies} previousValue={prevCamp?.replies || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
                           <StatCell value={camp.replyRate} previousValue={prevCamp?.replyRate || 0} startDate={startDate} endDate={endDate} isPercentage customClass="text-slate-400" rowIndex={idx + 1} />
 
-                          <StatCell value={camp.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                          <StatCell value={camp.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                          <StatCell value={camp.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                          <StatCell value={camp.sql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                          <StatCell value={camp.partner} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
-                          <StatCell value={camp.clients} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-slate-400 font-medium" rowIndex={idx + 1} />
+                          <StatCell value={camp.interested} previousValue={prevCamp?.interested || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.calls} previousValue={prevCamp?.calls || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.mql} previousValue={prevCamp?.mql || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.sql} previousValue={prevCamp?.sql || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.partner} previousValue={prevCamp?.partner || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400" rowIndex={idx + 1} />
+                          <StatCell value={camp.clients} previousValue={prevCamp?.clients || 0} startDate={startDate} endDate={endDate} customClass="text-slate-400 font-medium" rowIndex={idx + 1} />
                         </tr>
                       );
                     })}
@@ -500,12 +518,12 @@ export default function Dashboard() {
                 <StatCell value={totals.replies} previousValue={prevTotals.replies} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
                 <StatCell value={totalReplyRate} previousValue={((prevTotals.replies / (prevTotals.messages || 1)) * 100).toFixed(1)} startDate={startDate} endDate={endDate} isPercentage customClass="text-indigo-400" rowIndex={999} />
 
-                <StatCell value={totals.interested} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
-                <StatCell value={totals.calls} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
-                <StatCell value={totals.mql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={999} />
-                <StatCell value={totals.sql} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-orange-300" rowIndex={999} />
-                <StatCell value={totals.partner} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-rose-300" rowIndex={999} />
-                <StatCell value={totals.clients} previousValue={0} startDate={startDate} endDate={endDate} customClass="text-emerald-400 text-base" rowIndex={999} />
+                <StatCell value={totals.interested} previousValue={prevTotals.interested} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totals.calls} previousValue={prevTotals.calls} startDate={startDate} endDate={endDate} customClass="text-indigo-200" rowIndex={999} />
+                <StatCell value={totals.mql} previousValue={prevTotals.mql} startDate={startDate} endDate={endDate} customClass="text-amber-200" rowIndex={999} />
+                <StatCell value={totals.sql} previousValue={prevTotals.sql} startDate={startDate} endDate={endDate} customClass="text-orange-300" rowIndex={999} />
+                <StatCell value={totals.partner} previousValue={prevTotals.partner} startDate={startDate} endDate={endDate} customClass="text-rose-300" rowIndex={999} />
+                <StatCell value={totals.clients} previousValue={prevTotals.clients} startDate={startDate} endDate={endDate} customClass="text-emerald-400 text-base" rowIndex={999} />
               </tr>
             </tfoot>
           </table>

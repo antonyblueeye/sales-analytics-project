@@ -7,6 +7,9 @@ from sqlalchemy import text
 from models import Action, Lead
 from sqlalchemy import and_
 from datetime import datetime, date
+import uuid
+from fastapi import HTTPException
+from models import Campaign, Profile, Action
 
 def get_leads_list(
     db: Session, 
@@ -21,7 +24,9 @@ def get_leads_list(
     create_date_from: str = None,
     create_date_to: str = None,
     activity_date_from: str = None,
-    activity_date_to: str = None
+    activity_date_to: str = None,
+    campaign: str = None,
+    status: str = None
 ):
     offset = (page - 1) * limit
     
@@ -29,49 +34,60 @@ def get_leads_list(
     params = {"offset": offset, "limit": limit}
     
     if search:
-        where_clauses.append("(first_name ILIKE :search OR last_name ILIKE :search OR (first_name || ' ' || last_name) ILIKE :search OR current_employer ILIKE :search)")
+        where_clauses.append("(l.first_name ILIKE :search OR l.last_name ILIKE :search OR (l.first_name || ' ' || l.last_name) ILIKE :search OR l.current_employer ILIKE :search)")
         params["search"] = f"%{search}%"
     
     if first_name:
-        where_clauses.append("first_name ILIKE :fn")
+        where_clauses.append("l.first_name ILIKE :fn")
         params["fn"] = f"%{first_name}%"
     if last_name:
-        where_clauses.append("last_name ILIKE :ln")
+        where_clauses.append("l.last_name ILIKE :ln")
         params["ln"] = f"%{last_name}%"
     if company:
-        where_clauses.append("current_employer ILIKE :comp")
+        where_clauses.append("l.current_employer ILIKE :comp")
         params["comp"] = f"%{company}%"
     if location:
-        where_clauses.append("location ILIKE :loc")
+        where_clauses.append("l.location ILIKE :loc")
         params["loc"] = f"%{location}%"
     if title:
-        where_clauses.append("current_title ILIKE :ttl")
+        where_clauses.append("l.current_title ILIKE :ttl")
         params["ttl"] = f"%{title}%"
 
     if create_date_from:
-        where_clauses.append("created_at >= :c_from")
+        where_clauses.append("(l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MIN(performed_at) >= :c_from) OR (NOT EXISTS (SELECT 1 FROM actions WHERE lead_id = l.id) AND l.created_at >= :c_from))")
         params["c_from"] = create_date_from
     if create_date_to:
-        where_clauses.append("created_at <= :c_to")
+        where_clauses.append("(l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MIN(performed_at) <= :c_to) OR (NOT EXISTS (SELECT 1 FROM actions WHERE lead_id = l.id) AND l.created_at <= :c_to))")
         params["c_to"] = create_date_to
         
     if activity_date_from:
-        # For general leads, activity_date might mean 'any action performed at'
-        # This requires a JOIN or a subquery. For now, let's just filter leads by their creation date
-        # if we don't want to join actions for the entire 'All leads' list yet.
-        # But if accuracy is needed:
-        where_clauses.append("EXISTS (SELECT 1 FROM actions a WHERE a.lead_id = leads.id AND a.performed_at >= :a_from)")
+        where_clauses.append("l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MAX(performed_at) >= :a_from)")
         params["a_from"] = activity_date_from
     if activity_date_to:
-        where_clauses.append("EXISTS (SELECT 1 FROM actions a WHERE a.lead_id = leads.id AND a.performed_at <= :a_to)")
+        where_clauses.append("l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MAX(performed_at) <= :a_to)")
         params["a_to"] = activity_date_to
+        
+    if campaign:
+        where_clauses.append("EXISTS (SELECT 1 FROM actions act JOIN campaigns c ON act.campaign_id = c.id WHERE act.lead_id = l.id AND c.name ILIKE :camp)")
+        params["camp"] = f"%{campaign}%"
+
+    if status:
+        if status.lower() == 'replied':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied')")
+        elif status.lower() == 'connected':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id) AND NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied')")
+        elif status.lower() == 'new':
+            where_clauses.append("NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id)")
+        else:
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = :status_val)")
+            params["status_val"] = status.lower()
         
     where_sql = ""
     if where_clauses:
         where_sql = "WHERE " + " AND ".join(where_clauses)
         
     # Get total count with filters
-    count_query = text(f"SELECT count(*) FROM leads {where_sql}")
+    count_query = text(f"SELECT count(*) FROM leads l {where_sql}")
     total_count = db.execute(count_query, params).scalar()
     
     # FETCH LEADS with STATUS derived from actions
@@ -174,7 +190,9 @@ def get_replied_leads(
     create_date_from: str = None,
     create_date_to: str = None,
     activity_date_from: str = None,
-    activity_date_to: str = None
+    activity_date_to: str = None,
+    campaign: str = None,
+    status: str = None
 ):
     offset = (page - 1) * limit
     
@@ -203,21 +221,34 @@ def get_replied_leads(
         params["ttl"] = f"%{title}%"
 
     if create_date_from:
-        where_clauses.append("l.created_at >= :c_from")
+        where_clauses.append("(l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MIN(performed_at) >= :c_from) OR (NOT EXISTS (SELECT 1 FROM actions WHERE lead_id = l.id) AND l.created_at >= :c_from))")
         params["c_from"] = create_date_from
     if create_date_to:
-        where_clauses.append("l.created_at <= :c_to")
+        where_clauses.append("(l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MIN(performed_at) <= :c_to) OR (NOT EXISTS (SELECT 1 FROM actions WHERE lead_id = l.id) AND l.created_at <= :c_to))")
         params["c_to"] = create_date_to
         
     if activity_date_from:
-        # activity_date logic for Replied leads might need adjustment but 
-        # let's assume it means 'last reply performed at' or similar
-        where_clauses.append("a.performed_at >= :a_from")
+        where_clauses.append("l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MAX(performed_at) >= :a_from)")
         params["a_from"] = activity_date_from
     if activity_date_to:
-        where_clauses.append("a.performed_at <= :a_to")
+        where_clauses.append("l.id IN (SELECT lead_id FROM actions GROUP BY lead_id HAVING MAX(performed_at) <= :a_to)")
         params["a_to"] = activity_date_to
         
+    if campaign:
+        where_clauses.append("EXISTS (SELECT 1 FROM actions act JOIN campaigns c ON act.campaign_id = c.id WHERE act.lead_id = l.id AND c.name ILIKE :camp)")
+        params["camp"] = f"%{campaign}%"
+
+    if status:
+        if status.lower() == 'replied':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied')")
+        elif status.lower() == 'connected':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id) AND NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied')")
+        elif status.lower() == 'new':
+            where_clauses.append("NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id)")
+        else:
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = :status_val)")
+            params["status_val"] = status.lower()
+            
     where_sql = "WHERE " + " AND ".join(where_clauses)
     
     # Get total count of UNIQUE leads who replied with filters
@@ -339,6 +370,7 @@ def get_lead_activities(db: Session, lead_id: int):
             a.action_type,
             a.message,
             a.performed_at,
+            a.external_id,
             COALESCE(c.name, '') as campaign_name,
             COALESCE(p.name, '') as profile_name,
             p.id as profile_id
@@ -359,5 +391,42 @@ def get_lead_activities(db: Session, lead_id: int):
             "date": r["performed_at"].isoformat() if r["performed_at"] else None,
             "campaign": r["campaign_name"],
             "profile": r["profile_name"],
+            "isLocal": str(r["external_id"]).startswith("manual_") if r["external_id"] else False
         })
     return {"activities": activities}
+
+def add_lead_activity(db: Session, lead_id: int, activity_data):
+    campaign = db.query(Campaign).filter(Campaign.name == activity_data.campaign_name).first()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+        
+    profile = db.query(Profile).filter(Profile.name == activity_data.profile_name).first()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+
+    dt = datetime.fromisoformat(activity_data.date.replace("Z", "+00:00"))
+
+    new_action = Action(
+        external_id=f"manual_{uuid.uuid4().hex}",
+        action_type=activity_data.type,
+        message=activity_data.message,
+        performed_at=dt,
+        lead_id=lead_id,
+        campaign_id=campaign.id,
+        profile_id=profile.id
+    )
+    db.add(new_action)
+    db.commit()
+    db.refresh(new_action)
+    
+    return {"status": "success", "id": new_action.id}
+
+def remove_activity(db: Session, activity_id: int):
+    action = db.query(Action).filter(Action.id == activity_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Activity not found")
+        
+    db.delete(action)
+    db.commit()
+    
+    return {"status": "success"}

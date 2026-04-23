@@ -461,6 +461,8 @@ export default function CRMPage() {
             if (currentFilters.createDateRange?.to) params.append('create_date_to', currentFilters.createDateRange.to.toISOString());
             if (currentFilters.activityDateRange?.from) params.append('activity_date_from', currentFilters.activityDateRange.from.toISOString());
             if (currentFilters.activityDateRange?.to) params.append('activity_date_to', currentFilters.activityDateRange.to.toISOString());
+            if (currentFilters.campaign) params.append('campaign', currentFilters.campaign);
+            if (currentFilters.status) params.append('status', currentFilters.status);
 
             const res = await axios.get(`${endpoint}?${params.toString()}`);
             const mappedLeads = res.data.leads.map((l: any, idx: number) => ({
@@ -503,7 +505,11 @@ export default function CRMPage() {
             lastName: filterLastName,
             company: filterCompany,
             location: filterLocation,
-            position: filterPosition
+            position: filterPosition,
+            createDateRange: filterCreateDate,
+            activityDateRange: filterActivityDate,
+            campaign: filterCampaign,
+            status: filterStatus
         });
     }, [activeTab]);
 
@@ -519,12 +525,14 @@ export default function CRMPage() {
                 location: filterLocation,
                 position: filterPosition,
                 createDateRange: filterCreateDate,
-                activityDateRange: filterActivityDate
+                activityDateRange: filterActivityDate,
+                campaign: filterCampaign,
+                status: filterStatus
             });
         }, 500); // 500ms debounce
 
         return () => clearTimeout(handler);
-    }, [search, filterFirstName, filterLastName, filterCompany, filterLocation, filterPosition]);
+    }, [search, filterFirstName, filterLastName, filterCompany, filterLocation, filterPosition, filterCreateDate, filterActivityDate, filterCampaign, filterStatus]);
 
     // Handle pagination specifically
     useEffect(() => {
@@ -534,7 +542,11 @@ export default function CRMPage() {
             lastName: filterLastName,
             company: filterCompany,
             location: filterLocation,
-            position: filterPosition
+            position: filterPosition,
+            createDateRange: filterCreateDate,
+            activityDateRange: filterActivityDate,
+            campaign: filterCampaign,
+            status: filterStatus
         });
     }, [currentPage]);
 
@@ -575,6 +587,7 @@ export default function CRMPage() {
                 date: a.date,
                 campaign: a.campaign,
                 profile: a.profile,
+                isLocal: a.isLocal
             }));
 
             // Auto-select first profile for the timeline filter
@@ -589,7 +602,7 @@ export default function CRMPage() {
         }
     };
 
-    const handleSaveActivity = () => {
+    const handleSaveActivity = async () => {
         if (!activeLead) return;
         if (!selectedCampaign) {
             alert('Please select a campaign first');
@@ -608,44 +621,43 @@ export default function CRMPage() {
 
         const combinedDateTime = `${activityDate}T${activityTime}:00`;
 
-        const newActivity: LeadActivity = {
-            id: Date.now(),
-            type: selectedActivity,
-            message: activityMessage,
-            date: combinedDateTime,
-            campaign: selectedCampaign,
-            profile: selectedActivityProfile,
-            isLocal: true
-        };
+        try {
+            await axios.post(`http://localhost:8000/crm/leads/${activeLead.id}/activities`, {
+                type: selectedActivity,
+                message: activityMessage,
+                date: new Date(combinedDateTime).toISOString(),
+                campaign_name: selectedCampaign,
+                profile_name: selectedActivityProfile
+            });
 
-        const updatedProfileNames = activeLead.profileNames.includes(selectedActivityProfile)
-            ? activeLead.profileNames
-            : [...activeLead.profileNames, selectedActivityProfile];
-
-        const updatedLead = {
-            ...activeLead,
-            profileNames: updatedProfileNames,
-            activities: [...activeLead.activities, newActivity].sort((a, b) => {
-                const timeA = a.date ? new Date(a.date).getTime() : 0;
-                const timeB = b.date ? new Date(b.date).getTime() : 0;
-                if (timeA !== timeB) return timeA - timeB;
-                return a.id - b.id;
-            })
-        };
-        setActiveLead(updatedLead);
-        setSelectedLead(updatedLead);
-        setActivityMessage('');
-        showToast(`${selectedActivity.toUpperCase()} on ${activityDate}`);
+            // Re-fetch activities from the server to get real IDs and synced data
+            await loadActivities(activeLead);
+            
+            setActivityMessage('');
+            showToast(`${selectedActivity.toUpperCase()} on ${activityDate}`);
+        } catch (error) {
+            console.error('Failed to save activity', error);
+            alert('Failed to save activity');
+        }
     };
 
-    const handleDeleteActivity = (activityId: number) => {
+    const handleDeleteActivity = async (activityId: number) => {
         if (!activeLead) return;
-        const updatedLead = {
-            ...activeLead,
-            activities: activeLead.activities.filter(a => a.id !== activityId)
-        };
-        setActiveLead(updatedLead);
-        setSelectedLead(updatedLead);
+        
+        try {
+            await axios.delete(`http://localhost:8000/crm/activities/${activityId}`);
+            
+            const updatedLead = {
+                ...activeLead,
+                activities: activeLead.activities.filter(a => a.id !== activityId)
+            };
+            setActiveLead(updatedLead);
+            setSelectedLead(updatedLead);
+            showToast('Activity deleted');
+        } catch (error) {
+            console.error('Failed to delete activity', error);
+            alert('Failed to delete activity');
+        }
     };
 
     const activityTypes = [
@@ -851,13 +863,22 @@ export default function CRMPage() {
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Status</label>
-                            <input
-                                type="text"
-                                placeholder="Filter..."
-                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none"
+                            <select
+                                className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-slate-200"
                                 value={filterStatus}
                                 onChange={(e) => setFilterStatus(e.target.value)}
-                            />
+                            >
+                                <option value="">All Statuses</option>
+                                <option value="New">New</option>
+                                <option value="Connected">Connected</option>
+                                <option value="Replied">Replied</option>
+                                <option value="interested">Interested</option>
+                                <option value="call">Call</option>
+                                <option value="mql">MQL</option>
+                                <option value="sql">SQL</option>
+                                <option value="partner">Partner</option>
+                                <option value="client">Client</option>
+                            </select>
                         </div>
                         <div className="flex flex-col gap-1">
                             <label className="text-xs text-slate-400 font-medium ml-1">Position</label>
