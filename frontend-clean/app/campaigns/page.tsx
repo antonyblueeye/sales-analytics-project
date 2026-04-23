@@ -22,6 +22,7 @@ interface Template {
     sent_count: number;
     reply_count: number;
     is_invite: boolean;
+    campaigns: string[];
 }
 
 type SortCriterion = 'sent' | 'replies' | 'rate';
@@ -90,6 +91,19 @@ const TemplateCard = ({
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none" />
                 </div>
 
+                <div className="flex flex-wrap gap-1">
+                    {template.campaigns.slice(0, 2).map((c, idx) => (
+                        <span key={idx} className="px-1 py-0.5 rounded-[4px] bg-slate-800/80 border border-slate-700/50 text-[7px] font-bold text-slate-400 truncate max-w-[80px]">
+                            {c}
+                        </span>
+                    ))}
+                    {template.campaigns.length > 2 && (
+                        <span className="px-1 py-0.5 rounded-[4px] bg-slate-800/80 border border-slate-700/50 text-[7px] font-bold text-slate-500">
+                            +{template.campaigns.length - 2}
+                        </span>
+                    )}
+                </div>
+
                 <div className="flex items-center justify-between bg-slate-900/40 rounded-lg p-1.5 border border-slate-700/20">
                     <div className="flex items-center gap-2.5">
                         <div className="flex items-center gap-1">
@@ -138,6 +152,14 @@ const MessagePreview = ({ template }: { template: Template | null }) => {
                     </div>
                 </div>
                 <h2 className="text-sm font-extrabold text-white truncate">{template.title}</h2>
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                    {template.campaigns.map((c, idx) => (
+                        <div key={idx} className="flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-800/50 border border-slate-700/50">
+                            <Target size={8} className="text-indigo-400/70" />
+                            <span className="text-[9px] font-bold text-slate-300 tracking-tight">{c}</span>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-950/30 rounded-lg p-3 border border-slate-800/50">
@@ -168,6 +190,7 @@ const MessagePreview = ({ template }: { template: Template | null }) => {
 
 export default function CampaignsPage() {
     const [campaigns, setCampaigns] = useState<string[]>([]);
+    const [isGlobal, setIsGlobal] = useState(true);
     const [selectedCampaign, setSelectedCampaign] = useState<string>('');
     const [templates, setTemplates] = useState<Template[]>([]);
     const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
@@ -194,10 +217,13 @@ export default function CampaignsPage() {
 
     React.useEffect(() => {
         const fetchTemplates = async () => {
-            if (!selectedCampaign) return;
+            if (!isGlobal && !selectedCampaign) return;
             setDataLoading(true);
             try {
-                const response = await axios.get(`http://localhost:8000/analytics/campaign-sequence?campaign_name=${encodeURIComponent(selectedCampaign)}`);
+                const url = isGlobal 
+                    ? 'http://localhost:8000/analytics/campaign-sequence?campaign_name=ALL_CAMPAIGNS'
+                    : `http://localhost:8000/analytics/campaign-sequence?campaign_name=${encodeURIComponent(selectedCampaign)}`;
+                const response = await axios.get(url);
                 setTemplates(response.data);
                 setSelectedTemplate(null);
             } catch (error) {
@@ -207,7 +233,7 @@ export default function CampaignsPage() {
             }
         };
         fetchTemplates();
-    }, [selectedCampaign]);
+    }, [selectedCampaign, isGlobal]);
 
     const sortedTemplates = useMemo(() => {
         return [...templates].sort((a, b) => {
@@ -235,20 +261,51 @@ export default function CampaignsPage() {
 
     return (
         <div className="max-w-[1600px] mx-auto py-6 px-6">
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
+            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 w-full">
                 <div className="flex-1">
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1">Top Templates</h1>
-                    <p className="text-slate-500 text-sm">Analyze and inspect your outreach message performance.</p>
+                    <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1">
+                        {isGlobal ? 'Global Analytics' : 'Campaign Analytics'}
+                    </h1>
+                    <p className="text-slate-500 text-sm">
+                        {isGlobal 
+                            ? 'Top performing messages across all your campaigns.' 
+                            : 'Performance breakdown for a specific campaign group.'}
+                    </p>
                 </div>
 
-                <div className="w-full md:w-80 flex flex-col items-end">
-                    <CustomSelect 
-                        value={selectedCampaign}
-                        onChange={setSelectedCampaign}
-                        options={campaignOptions}
-                        placeholder="Select campaign"
-                        icon={<Target size={16} />}
-                    />
+                <div className="flex flex-col items-end gap-3 shrink-0">
+                    <div className="flex p-1 bg-slate-900/80 rounded-xl border border-slate-800 shadow-inner w-80">
+                        <button 
+                            onClick={() => setIsGlobal(true)}
+                            className={`flex-1 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                                isGlobal 
+                                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
+                                : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            All Campaigns
+                        </button>
+                        <button 
+                            onClick={() => setIsGlobal(false)}
+                            className={`flex-1 px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${
+                                !isGlobal 
+                                ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
+                                : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            Custom
+                        </button>
+                    </div>
+                    
+                    <div className={`w-80 transition-all duration-500 ${isGlobal ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                        <CustomSelect 
+                            value={selectedCampaign}
+                            onChange={setSelectedCampaign}
+                            options={campaignOptions}
+                            placeholder="Select campaign"
+                            icon={<Target size={16} />}
+                        />
+                    </div>
                 </div>
             </div>
 

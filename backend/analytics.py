@@ -211,56 +211,120 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
         for row in results
     ]
 
-def get_campaign_sequence(db: Session, campaign_name: str):
+def get_campaign_sequence(db: Session, campaign_name: str = None):
     """
-    Returns top message templates for a campaign (sent > 10), 
-    aggregated by template text across all sequence steps.
+    Returns top message templates. 
+    If campaign_name is 'ALL_CAMPAIGNS' or None, aggregates across all campaigns (Sent > 100).
+    Otherwise, aggregates for a specific campaign group (Sent > 10).
     """
-    # 1. Find campaign IDs that match the (already cleaned) name from frontend
-    res = db.execute(text("""
-        SELECT id FROM campaigns 
-        WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
-    """), {"name": campaign_name})
-    campaign_ids = [row[0] for row in res]
+    is_global = not campaign_name or campaign_name == 'ALL_CAMPAIGNS'
     
-    if not campaign_ids:
-        res = db.execute(text("SELECT id FROM campaigns WHERE name = :name"), {"name": campaign_name})
+    # 1. Determine campaign IDs (if not global)
+    campaign_ids = []
+    if not is_global:
+        res = db.execute(text("""
+            SELECT id FROM campaigns 
+            WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
+        """), {"name": campaign_name})
         campaign_ids = [row[0] for row in res]
-        if not campaign_ids: return []
+        
+        if not campaign_ids:
+            res = db.execute(text("SELECT id FROM campaigns WHERE name = :name"), {"name": campaign_name})
+            campaign_ids = [row[0] for row in res]
+            if not campaign_ids: return []
 
-    # 2. Query top templates (Sent > 10), grouping by the template text itself
+    # 2. Query top templates, grouping by the normalized template text
+    threshold = 100 if is_global else 10
+    
+    from sqlalchemy import distinct
+    from difflib import SequenceMatcher
+    
+    def get_similarity(a: str, b: str) -> float:
+        return SequenceMatcher(None, a.lower(), b.lower()).ratio()
+    
+    # Normalize text by removing all non-alphanumeric characters and lowercasing
+    normalized_text = func.lower(func.regexp_replace(MessageTemplate.template, '[^a-zA-Z0-9]', '', 'g'))
+    
     query = db.query(
-        MessageTemplate.template,
+        func.max(MessageTemplate.template).label('template'), # Pick one version to display
         func.min(MessageTemplate.id).label('representative_id'),
         func.min(MessageTemplate.step_index).label('min_step'),
         func.count(MessageTemplateMap.id).label('sent_count'),
         func.count(MessageTemplateMap.id).filter(MessageTemplateMap.replied == True).label('reply_count'),
-        func.min(MessageTemplateMap.created_at).label('first_seen')
+        func.min(MessageTemplateMap.created_at).label('first_seen'),
+        func.string_agg(distinct(Campaign.name), ', ').label('campaign_names')
     ).join(MessageTemplateMap, MessageTemplate.id == MessageTemplateMap.message_template_id)\
-     .filter(MessageTemplate.campaign_id.in_(campaign_ids))\
-     .group_by(MessageTemplate.template)\
-     .having(func.count(MessageTemplateMap.id) > 10)\
-     .order_by(func.count(MessageTemplateMap.id).desc())\
-     .all()
+     .join(Campaign, MessageTemplate.campaign_id == Campaign.id)
+    
+    if not is_global:
+        query = query.filter(MessageTemplate.campaign_id.in_(campaign_ids))
+    
+    # We fetch everything > 15 (global) or > 3 (custom) to allow fragments to merge, but not overload Python
+    fetch_threshold = 15 if is_global else 3
+    raw_results = query.group_by(normalized_text)\
+                       .having(func.count(MessageTemplateMap.id) > fetch_threshold)\
+                       .order_by(func.count(MessageTemplateMap.id).desc())\
+                       .all()
 
-    if not query:
+    if not raw_results:
         return []
 
-    # 3. Format into a flat list
-    result = []
-    for row in query:
+    # 3. Fuzzy Merge & Format into a flat list
+    import re
+    merged_results = []
+    
+    for row in raw_results:
         is_invite = (row.min_step == 0)
-        # Using a generic title if it's found at multiple steps, or "Invitation" if it's used as one
         title = "Invitation Template" if is_invite else "Outreach Message"
         
-        result.append({
+        # Clean campaign names: remove tags like [TAG] and limit number
+        raw_names = row.campaign_names.split(', ') if row.campaign_names else []
+        clean_names = sorted(list(set([re.sub(r'\s*(\[[^\]]*\]|\([^\)]*\))', '', n).strip() for n in raw_names])))
+        
+        current_item = {
             "id": row.representative_id,
             "title": title,
             "text": row.template,
             "date": row.first_seen.strftime("%d.%m.%Y") if row.first_seen else "N/A",
             "sent_count": row.sent_count,
             "reply_count": row.reply_count,
-            "is_invite": is_invite
-        })
+            "is_invite": is_invite,
+            "campaigns": clean_names
+        }
+        
+        # Try to find a fuzzy match in already merged results
+        found_match = False
+        l1 = len(current_item["text"])
+        
+        for existing in merged_results:
+            l2 = len(existing["text"])
+            # Fast fail: if length difference is too big, they can't be 75% similar
+            if l1 == 0 or l2 == 0 or abs(l1 - l2) / max(l1, l2) > 0.3:
+                continue
+                
+            if get_similarity(current_item["text"], existing["text"]) >= 0.75: # 75% similarity threshold
+                existing["sent_count"] += current_item["sent_count"]
+                existing["reply_count"] += current_item["reply_count"]
+                existing["campaigns"] = sorted(list(set(existing["campaigns"] + current_item["campaigns"])))
+                
+                # If we merged an invite, mark the whole group as invite
+                if current_item["is_invite"]:
+                    existing["is_invite"] = True
+                    existing["title"] = "Invitation Template"
+                
+                # Keep the longer text as representative (often the one with the extra intro is better)
+                if len(current_item["text"]) > len(existing["text"]):
+                    existing["text"] = current_item["text"]
+                
+                found_match = True
+                break
+                
+        if not found_match:
+            merged_results.append(current_item)
 
-    return result
+    # 4. Filter by the actual threshold and re-sort
+    final_results = [m for m in merged_results if m["sent_count"] > threshold]
+    final_results.sort(key=lambda x: x["sent_count"], reverse=True)
+
+    return final_results
+

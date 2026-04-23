@@ -247,7 +247,7 @@ def recent_replies(
 
 @app.get("/analytics/campaign-sequence")
 def campaign_sequence(
-    campaign_name: str,
+    campaign_name: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     from analytics import get_campaign_sequence

@@ -46,10 +46,10 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
     const activeOption = options.find((opt) => opt.value === value);
 
     return (
-        <div className="relative" ref={containerRef}>
+        <div className="relative w-full" ref={containerRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-medium shadow-sm bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500/50 group h-[42px] min-w-[200px]"
+                className="flex items-center justify-between w-full gap-3 px-4 py-2.5 rounded-xl border transition-all duration-200 text-sm font-medium shadow-sm bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700 hover:border-slate-500 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-indigo-500/50 group h-[42px] min-w-[200px]"
             >
                 <div className="flex items-center gap-2 overflow-hidden">
                     {icon && <span className="text-indigo-400 group-hover:text-indigo-300 transition-colors shrink-0">{icon}</span>}
