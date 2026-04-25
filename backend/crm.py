@@ -396,7 +396,24 @@ def get_lead_activities(db: Session, lead_id: int):
     return {"activities": activities}
 
 def add_lead_activity(db: Session, lead_id: int, activity_data):
+    # Try exact match first
     campaign = db.query(Campaign).filter(Campaign.name == activity_data.campaign_name).first()
+    
+    if not campaign:
+        # Try matching cleaned name
+        res = db.execute(text("""
+            SELECT id FROM campaigns 
+            WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
+            LIMIT 1
+        """), {"name": activity_data.campaign_name})
+        row = res.first()
+        if row:
+            campaign = db.query(Campaign).get(row[0])
+
+    if not campaign:
+        # Fallback to ilike match
+        campaign = db.query(Campaign).filter(Campaign.name.ilike(f"%{activity_data.campaign_name}%")).first()
+
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")
         
@@ -418,6 +435,17 @@ def add_lead_activity(db: Session, lead_id: int, activity_data):
     db.add(new_action)
     db.commit()
     db.refresh(new_action)
+    
+    # --- ДОПОЛНИТЕЛЬНОЕ ЛОГИРОВАНИЕ В ФАЙЛ (ДЛЯ БЕЗОПАСНОСТИ) ---
+    log_file = "manual_actions.log"
+    log_entry = (
+        f"[{datetime.now().isoformat()}] LEAD_ID: {lead_id} | TYPE: {activity_data.type} | "
+        f"CAMPAIGN: {activity_data.campaign_name} | PROFILE: {activity_data.profile_name} | "
+        f"MSG: {activity_data.message.replace('\n', ' ')}\n"
+    )
+    with open(log_file, "a", encoding="utf-8") as f:
+        f.write(log_entry)
+    # -----------------------------------------------------------
     
     return {"status": "success", "id": new_action.id}
 

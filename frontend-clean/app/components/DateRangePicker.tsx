@@ -39,12 +39,12 @@ const PRESETS = [
 
 export default function DateRangePicker({ onDateChange }: DateRangePickerProps) {
     const [range, setRange] = useState<DateRange>({
-        from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+        from: subDays(new Date(), 6),
         to: new Date()
     });
     const [tempRange, setTempRange] = useState<DateRange | undefined>(range);
     const [isOpen, setIsOpen] = useState(false);
-    const [activePreset, setActivePreset] = useState<string>('This week');
+    const [activePreset, setActivePreset] = useState<string>('Last 7 days');
     
     const containerRef = useRef<HTMLDivElement>(null);
 

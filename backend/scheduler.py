@@ -2,6 +2,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from services.meetalfred_client import sync_all_profiles_data
 from services.template_service import process_campaign_templates
+from backup_db import backup_database
+import logging
 
 def job_sync_all():
     print("[Scheduler] Запуск синхронизации всех профилей...")
@@ -14,6 +16,10 @@ def job_sync_all():
         # 2. Process templates for new actions
         template_result = process_campaign_templates(db)
         print(f"[Scheduler] Обработка шаблонов завершена: {template_result} новых связей.")
+        
+        # 3. Резервное копирование базы
+        print("[Scheduler] Запуск планового бэкапа базы...")
+        backup_database()
         
     except Exception as e:
         print(f"[Scheduler] Ошибка: {e}")

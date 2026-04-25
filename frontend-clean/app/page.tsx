@@ -139,7 +139,7 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
 };
 
 export default function Dashboard() {
-  const [startDate, setStartDate] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
+  const [startDate, setStartDate] = useState(subDays(new Date(), 6));
   const [endDate, setEndDate] = useState(new Date());
   const [profiles, setProfiles] = useState<ProfileData[]>([]); // Данные текущего периода
   const [prevProfiles, setPrevProfiles] = useState<ProfileData[]>([]); // Данные предыдущего периода для сравнения

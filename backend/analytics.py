@@ -81,7 +81,7 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
         with clean_campaigns as (
             select 
                 id,
-                trim(regexp_replace(name, '\s*(\[[^\]]*\]|\([^\)]*\))', '', 'g')) AS clean_campaign
+                trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign
             from campaigns
         )
         select 
