@@ -60,9 +60,9 @@ class Action(Base):
     message = Column(String)
     performed_at = Column(DateTime(timezone=True), nullable=False, index=True)
 
-    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False)
-    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
-    profile_id = Column(Integer, ForeignKey("profiles.id"), nullable=False)
+    lead_id = Column(Integer, ForeignKey("leads.id"), nullable=False, index=True)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False, index=True)
+    profile_id = Column(Integer, ForeignKey("profiles.id"), nullable=False, index=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -84,7 +84,7 @@ class MessageTemplate(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     template = Column(String, nullable=False)
-    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False)
+    campaign_id = Column(Integer, ForeignKey("campaigns.id"), nullable=False, index=True)
     step_index = Column(Integer, nullable=False)  # 0 for invitation, 1+ for messages
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())

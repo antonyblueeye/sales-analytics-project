@@ -1,4 +1,6 @@
 import sys
+from functools import lru_cache
+from database import SessionLocal
 import os
 # Добавляем текущую директорию в путь поиска модулей, чтобы импорты из этого же фолдера работали корректно
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -9,6 +11,11 @@ from models import Action, Lead, MessageTemplate, MessageTemplateMap, Campaign, 
 from sqlalchemy import and_, func
 from datetime import datetime, date, timedelta
 from collections import defaultdict
+import time
+
+# Simple global cache to store expensive analytics results
+_analytics_cache = {}
+CACHE_TTL = 300  # 5 minutes in seconds
 
 def get_total_actions(db: Session, from_date: datetime = None, to_date: datetime = None) -> int:
     query = db.query(Action)
@@ -243,6 +250,13 @@ def get_campaign_sequence(db: Session, campaign_name: str = None):
     """
     is_global = not campaign_name or campaign_name == 'ALL_CAMPAIGNS'
     
+    # 0. Check cache for global analytics
+    if is_global:
+        cache_key = "global_campaign_analytics"
+        cached_val = _analytics_cache.get(cache_key)
+        if cached_val and (time.time() - cached_val['timestamp'] < CACHE_TTL):
+            return cached_val['data']
+    
     # 1. Determine campaign IDs (if not global)
     campaign_ids = []
     if not is_global:
@@ -270,32 +284,35 @@ def get_campaign_sequence(db: Session, campaign_name: str = None):
     normalized_text = func.lower(func.regexp_replace(MessageTemplate.template, '[^a-zA-Z0-9]', '', 'g'))
     
     query = db.query(
-        func.max(MessageTemplate.template).label('template'), # Pick one version to display
+        func.max(MessageTemplate.template).label('template'),  # Representative template text
         func.min(MessageTemplate.id).label('representative_id'),
         func.min(MessageTemplate.step_index).label('min_step'),
         func.count(MessageTemplateMap.id).label('sent_count'),
         func.count(MessageTemplateMap.id).filter(MessageTemplateMap.replied == True).label('reply_count'),
         func.min(MessageTemplateMap.created_at).label('first_seen'),
-        func.string_agg(distinct(Campaign.name), ', ').label('campaign_names')
+        func.string_agg(distinct(Campaign.name), ', ').label('campaign_names'),
+        func.array_agg(distinct(MessageTemplate.id)).label('template_ids')
     ).join(MessageTemplateMap, MessageTemplate.id == MessageTemplateMap.message_template_id)\
      .join(Campaign, MessageTemplate.campaign_id == Campaign.id)
     
     if not is_global:
         query = query.filter(MessageTemplate.campaign_id.in_(campaign_ids))
     
-    # We fetch everything > 15 (global) or > 3 (custom) to allow fragments to merge, but not overload Python
-    fetch_threshold = 15 if is_global else 3
+    # Adjust fetch threshold for global view to reduce number of rows processed
+    fetch_threshold = 20 if is_global else 3
+    # Limit the number of results after ordering to improve response time
     raw_results = query.group_by(normalized_text)\
                        .having(func.count(MessageTemplateMap.id) > fetch_threshold)\
                        .order_by(func.count(MessageTemplateMap.id).desc())\
+                       .limit(100)\
                        .all()
 
     if not raw_results:
         return []
 
-    # 3. Fuzzy Merge & Format into a flat list
+    # 3. Linear aggregation of results (no fuzzy merging)
     import re
-    merged_results = []
+    aggregated_results = []
     
     for row in raw_results:
         is_invite = (row.min_step == 0)
@@ -305,7 +322,7 @@ def get_campaign_sequence(db: Session, campaign_name: str = None):
         raw_names = row.campaign_names.split(', ') if row.campaign_names else []
         clean_names = sorted(list(set([re.sub(r'\s*(\[[^\]]*\]|\([^\)]*\))', '', n).strip() for n in raw_names])))
         
-        current_item = {
+        aggregated_results.append({
             "id": row.representative_id,
             "title": title,
             "text": row.template,
@@ -313,42 +330,20 @@ def get_campaign_sequence(db: Session, campaign_name: str = None):
             "sent_count": row.sent_count,
             "reply_count": row.reply_count,
             "is_invite": is_invite,
-            "campaigns": clean_names
-        }
-        
-        # Try to find a fuzzy match in already merged results
-        found_match = False
-        l1 = len(current_item["text"])
-        
-        for existing in merged_results:
-            l2 = len(existing["text"])
-            # Fast fail: if length difference is too big, they can't be 75% similar
-            if l1 == 0 or l2 == 0 or abs(l1 - l2) / max(l1, l2) > 0.3:
-                continue
-                
-            if get_similarity(current_item["text"], existing["text"]) >= 0.75: # 75% similarity threshold
-                existing["sent_count"] += current_item["sent_count"]
-                existing["reply_count"] += current_item["reply_count"]
-                existing["campaigns"] = sorted(list(set(existing["campaigns"] + current_item["campaigns"])))
-                
-                # If we merged an invite, mark the whole group as invite
-                if current_item["is_invite"]:
-                    existing["is_invite"] = True
-                    existing["title"] = "Invitation Template"
-                
-                # Keep the longer text as representative (often the one with the extra intro is better)
-                if len(current_item["text"]) > len(existing["text"]):
-                    existing["text"] = current_item["text"]
-                
-                found_match = True
-                break
-                
-        if not found_match:
-            merged_results.append(current_item)
+            "campaigns": clean_names,
+            "template_ids": row.template_ids,
+        })
 
     # 4. Filter by the actual threshold and re-sort
-    final_results = [m for m in merged_results if m["sent_count"] > threshold]
+    final_results = [m for m in aggregated_results if m["sent_count"] > threshold]
     final_results.sort(key=lambda x: x["sent_count"], reverse=True)
+
+    # Cache the result if global
+    if is_global:
+        _analytics_cache["global_campaign_analytics"] = {
+            'data': final_results,
+            'timestamp': time.time()
+        }
 
     return final_results
 

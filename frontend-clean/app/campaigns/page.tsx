@@ -23,6 +23,7 @@ interface Template {
     reply_count: number;
     is_invite: boolean;
     campaigns: string[];
+    template_ids: number[];
 }
 
 type SortCriterion = 'sent' | 'replies' | 'rate';
