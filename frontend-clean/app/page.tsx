@@ -4,7 +4,11 @@ import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import DateRangePicker from './components/DateRangePicker';
 import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus, Loader2 } from 'lucide-react';
-import { format, subDays, differenceInDays, startOfWeek } from 'date-fns';
+import { 
+  format, subDays, differenceInDays, startOfWeek, 
+  subMonths, subYears, startOfMonth, endOfMonth, 
+  startOfYear, endOfYear, isSameDay 
+} from 'date-fns';
 import axios from 'axios';
 
 const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
@@ -47,6 +51,45 @@ interface StatCellProps {
   rowIndex: number;
 }
 
+// Utility to calculate semantic previous period
+const getPreviousPeriod = (startDate: Date, endDate: Date) => {
+  const duration = differenceInDays(endDate, startDate) + 1;
+  
+  // 1. Check if it's a full month selection
+  const isStartOfMonth = startDate.getDate() === 1;
+  const isEndOfMonth = isSameDay(endDate, endOfMonth(startDate));
+  
+  if (isStartOfMonth && isEndOfMonth) {
+    const prevMonthStart = startOfMonth(subMonths(startDate, 1));
+    const prevMonthEnd = endOfMonth(prevMonthStart);
+    return { start: prevMonthStart, end: prevMonthEnd };
+  }
+  
+  // 2. Check if it's a full year selection
+  const isStartOfYear = startDate.getMonth() === 0 && startDate.getDate() === 1;
+  const isEndOfYear = isSameDay(endDate, endOfYear(startDate));
+  
+  if (isStartOfYear && isEndOfYear) {
+    const prevYearStart = startOfYear(subYears(startDate, 1));
+    const prevYearEnd = endOfYear(prevYearStart);
+    return { start: prevYearStart, end: prevYearEnd };
+  }
+
+  // 3. Handle Year-to-Date (This Year preset)
+  if (isStartOfYear && isSameDay(endDate, new Date())) {
+    return { 
+      start: startOfYear(subYears(startDate, 1)), 
+      end: subYears(endDate, 1) 
+    };
+  }
+
+  // Fallback: strictly duration-based offset
+  return {
+    start: subDays(startDate, duration),
+    end: subDays(startDate, 1)
+  };
+};
+
 const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, customClass, rowIndex }: StatCellProps) => {
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
   const [visible, setVisible] = useState(false);
@@ -60,9 +103,9 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
   const diff = valNum - prevValNum;
   const trend = diff > 0 ? 'up' : diff < 0 ? 'down' : 'equal';
 
-  const duration = differenceInDays(endDate, startDate) + 1;
-  const prevStartDate = subDays(startDate, duration);
-  const prevEndDate = subDays(endDate, duration);
+  const prevPeriod = getPreviousPeriod(startDate, endDate);
+  const prevStartDate = prevPeriod.start;
+  const prevEndDate = prevPeriod.end;
 
   const handleMouseEnter = (e: React.MouseEvent) => {
     setMousePos({ x: e.clientX, y: e.clientY });
@@ -153,10 +196,10 @@ export default function Dashboard() {
   const fetchProfiles = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Вычисляем даты предыдущего периода такой же длительности
-      const duration = differenceInDays(endDate, startDate) + 1;
-      const prevStart = subDays(startDate, duration);
-      const prevEnd = subDays(startDate, 1);
+      // Вычисляем даты предыдущего периода семантически
+      const prevPeriod = getPreviousPeriod(startDate, endDate);
+      const prevStart = prevPeriod.start;
+      const prevEnd = prevPeriod.end;
 
       // Запускаем все запросы параллельно: профили и кампании (текущие и прошлые)
       const [currRes, prevRes, currCampRes, prevCampRes, dailyRes, recentRepliesRes] = await Promise.all([
