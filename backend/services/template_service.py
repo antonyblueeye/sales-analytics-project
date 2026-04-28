@@ -107,9 +107,19 @@ def process_campaign_templates(db: Session, prioritize_campaign_name: str = None
                     step_index = prev_msgs + 1
 
                 is_replied = False
-                if idx_in_history != -1 and idx_in_history + 1 < len(full_history):
-                    if full_history[idx_in_history + 1].action_type == 'replied':
-                        is_replied = True
+                is_accepted = False
+                if idx_in_history != -1:
+                    # Look ahead for 'replied' or 'accepted'
+                    for next_action in full_history[idx_in_history + 1:]:
+                        if next_action.action_type == 'replied':
+                            is_replied = True
+                        if next_action.action_type == 'accepted':
+                            is_accepted = True
+                        # If we see another 'message sent' or 'invited', stop looking? 
+                        # Actually, we want to know if THIS invite ever got accepted.
+                        # Usually, acceptance comes before the next message.
+                        if next_action.action_type in ['invited', 'message sent']:
+                            break
 
                 # 5. Find or Create Template (Search across ALL steps in the group)
                 cache_key = group_ids
@@ -146,7 +156,8 @@ def process_campaign_templates(db: Session, prioritize_campaign_name: str = None
                 mapping = MessageTemplateMap(
                     action_id=action.id,
                     message_template_id=found_template.id,
-                    replied=is_replied
+                    replied=is_replied,
+                    accepted=is_accepted
                 )
                 db.add(mapping)
                 processed_count += 1

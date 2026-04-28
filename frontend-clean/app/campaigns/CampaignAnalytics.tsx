@@ -189,7 +189,7 @@ const MessagePreview = ({ template }: { template: Template | null }) => {
     );
 }
 
-export default function CampaignsPage() {
+export default function CampaignAnalytics() {
     const [campaigns, setCampaigns] = useState<string[]>([]);
     const [isGlobal, setIsGlobal] = useState(true);
     const [selectedCampaign, setSelectedCampaign] = useState<string>('');
@@ -274,20 +274,9 @@ export default function CampaignsPage() {
     }
 
     return (
-        <div className="max-w-[1600px] mx-auto py-6 px-6">
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 w-full">
-                <div className="flex-1">
-                    <h1 className="text-3xl font-extrabold text-white tracking-tight mb-1">
-                        {isGlobal ? 'Global Analytics' : 'Campaign Analytics'}
-                    </h1>
-                    <p className="text-slate-500 text-sm">
-                        {isGlobal 
-                            ? 'Top performing messages across all your campaigns.' 
-                            : 'Performance breakdown for a specific campaign group.'}
-                    </p>
-                </div>
-
-                <div className="flex flex-col items-end gap-3 shrink-0">
+        <div className="w-full">
+            <div className="flex flex-col md:flex-row md:items-start justify-start gap-6 mb-8 w-full relative z-[60]">
+                <div className="flex flex-row items-center gap-4 shrink-0">
                     <div className="flex p-1 bg-slate-900/80 rounded-xl border border-slate-800 shadow-inner w-80">
                         <button 
                             onClick={() => setIsGlobal(true)}
@@ -311,7 +300,7 @@ export default function CampaignsPage() {
                         </button>
                     </div>
                     
-                    <div className={`w-80 transition-all duration-500 ${isGlobal ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                    <div className={`w-80 transition-all duration-500 transform ${isGlobal ? 'opacity-0 scale-95 pointer-events-none translate-x-[-10px]' : 'opacity-100 scale-100 translate-x-0'}`}>
                         <CustomSelect 
                             value={selectedCampaign}
                             onChange={setSelectedCampaign}

@@ -99,6 +99,7 @@ class MessageTemplateMap(Base):
     action_id = Column(Integer, ForeignKey("actions.id"), unique=True, nullable=False)
     message_template_id = Column(Integer, ForeignKey("message_templates.id"), nullable=False)
     replied = Column(Boolean, default=False)
+    accepted = Column(Boolean, default=False)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

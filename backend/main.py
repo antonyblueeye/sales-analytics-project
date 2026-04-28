@@ -284,3 +284,12 @@ def campaign_sequence(
 ):
     from analytics import get_campaign_sequence
     return get_campaign_sequence(db, campaign_name)
+
+@app.get("/analytics/custom-messages")
+def custom_messages_analytics(
+    mode: str = "replied", 
+    profiles: Optional[list[str]] = Query(None), 
+    db: Session = Depends(get_db)
+):
+    from analytics import get_custom_messages_analytics
+    return get_custom_messages_analytics(db, mode, profiles)

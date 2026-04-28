@@ -347,3 +347,122 @@ def get_campaign_sequence(db: Session, campaign_name: str = None):
 
     return final_results
 
+def get_custom_messages_analytics(db: Session, mode: str = 'replied', profile_names: list = None):
+    """
+    Returns analytics for custom messages.
+    mode: 'replied' or 'accepted'
+    profile_names: optional list of profile names to filter by
+    """
+    is_accepted_mode = mode == 'accepted'
+    
+    profile_filter = ""
+    if profile_names:
+        profile_filter = "AND p.name IN :profile_names"
+
+    if is_accepted_mode:
+        sql = text(f"""
+            WITH all_invited_actions AS (
+                SELECT 
+                    a.id,
+                    a.lead_id,
+                    a.campaign_id,
+                    a.performed_at,
+                    a.profile_id,
+                    SUBSTRING(a.message FROM POSITION(',' IN a.message) + 1) as pattern
+                FROM actions a
+                WHERE a.action_type = 'invited'
+                  AND a.message IS NOT NULL 
+                  AND a.message <> 'Invite sent without message'
+                  AND a.message <> ''
+            ),
+            pattern_counts AS (
+                SELECT pattern, COUNT(*) as total_num
+                FROM all_invited_actions
+                GROUP BY pattern
+            ),
+            custom_invites_global AS (
+                SELECT ia.*
+                FROM all_invited_actions ia
+                JOIN pattern_counts pc ON ia.pattern = pc.pattern
+                WHERE pc.total_num < 8
+            ),
+            filtered_custom_invites AS (
+                SELECT ci.*
+                FROM custom_invites_global ci
+                JOIN profiles p ON ci.profile_id = p.id
+                WHERE 1=1 {profile_filter}
+            ),
+            acceptance_stats AS (
+                SELECT 
+                    fci.campaign_id,
+                    COUNT(fci.id) as sent_count,
+                    COUNT(DISTINCT a_acc.id) as accepted_count
+                FROM filtered_custom_invites fci
+                LEFT JOIN actions a_acc ON fci.lead_id = a_acc.lead_id 
+                    AND fci.campaign_id = a_acc.campaign_id 
+                    AND a_acc.action_type = 'accepted'
+                    AND a_acc.performed_at > fci.performed_at
+                GROUP BY fci.campaign_id
+            )
+            SELECT 
+                trim(regexp_replace(c.name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign,
+                SUM(ast.sent_count) as sent_count,
+                SUM(ast.accepted_count) as success_count
+            FROM acceptance_stats ast
+            JOIN campaigns c ON ast.campaign_id = c.id
+            GROUP BY clean_campaign
+            ORDER BY sent_count DESC
+        """)
+    else:
+        sql = text(f"""
+            WITH global_custom_templates AS (
+                SELECT message_template_id
+                FROM message_templates_map
+                GROUP BY message_template_id
+                HAVING COUNT(*) = 1
+            ),
+            filtered_metrics AS (
+                SELECT 
+                    mt.campaign_id,
+                    mtm.id as mapping_id,
+                    mtm.replied
+                FROM message_templates_map mtm
+                JOIN global_custom_templates gct ON mtm.message_template_id = gct.message_template_id
+                JOIN message_templates mt ON mtm.message_template_id = mt.id
+                JOIN actions a ON mtm.action_id = a.id
+                JOIN profiles p ON a.profile_id = p.id
+                WHERE 1=1 {profile_filter}
+            ),
+            campaign_metrics AS (
+                SELECT 
+                    campaign_id,
+                    COUNT(mapping_id) as custom_sent_count,
+                    COUNT(mapping_id) FILTER (WHERE replied = TRUE) as custom_reply_count
+                FROM filtered_metrics
+                GROUP BY campaign_id
+            )
+            SELECT 
+                trim(regexp_replace(c.name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign,
+                SUM(cm.custom_sent_count) as sent_count,
+                SUM(cm.custom_reply_count) as success_count
+            FROM campaign_metrics cm
+            JOIN campaigns c ON cm.campaign_id = c.id
+            GROUP BY clean_campaign
+            ORDER BY sent_count DESC
+        """)
+    
+    params = {}
+    if profile_names:
+        params["profile_names"] = tuple(profile_names)
+        
+    result = db.execute(sql, params)
+    return [
+        {
+            "campaign_name": row.clean_campaign,
+            "sent_count": int(row.sent_count),
+            "reply_count" if not is_accepted_mode else "accepted_count": int(row.success_count),
+            "reply_rate" if not is_accepted_mode else "acceptance_rate": round((row.success_count / row.sent_count * 100), 2) if row.sent_count > 0 else 0
+        }
+        for row in result
+    ]
+
