@@ -438,8 +438,12 @@ def add_lead_activity(db: Session, lead_id: int, activity_data):
     
     # --- ДОПОЛНИТЕЛЬНОЕ ЛОГИРОВАНИЕ В ФАЙЛ (ДЛЯ БЕЗОПАСНОСТИ) ---
     log_file = "manual_actions.log"
+    # Получаем имя лида для лога
+    lead = db.query(Lead).filter(Lead.id == lead_id).first()
+    lead_name = f"{lead.first_name} {lead.last_name}" if lead else "Unknown"
+    
     log_entry = (
-        f"[{datetime.now().isoformat()}] LEAD_ID: {lead_id} | TYPE: {activity_data.type} | "
+        f"[{datetime.now().isoformat()}] LEAD_ID: {lead_id} | NAME: {lead_name} | TYPE: {activity_data.type} | "
         f"CAMPAIGN: {activity_data.campaign_name} | PROFILE: {activity_data.profile_name} | "
         f"MSG: {activity_data.message.replace('\n', ' ')}\n"
     )

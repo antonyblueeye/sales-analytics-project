@@ -1,5 +1,15 @@
 {
   "css.lint.unknownAtRules": "ignore",
-  "python.defaultInterpreterPath": "backend/venv/Scripts/python.exe",
-  "python.analysis.extraPaths": ["./backend"]
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+  "python.analysis.extraPaths": [
+    "c:/Users/anton/Documents/data_analytics/sales_project/backend",
+    "c:/Users/anton/Documents/data_analytics/sales_project/backend/venv/Lib/site-packages"
+  ],
+  "python.autoComplete.extraPaths": [
+    "c:/Users/anton/Documents/data_analytics/sales_project/backend",
+    "c:/Users/anton/Documents/data_analytics/sales_project/backend/venv/Lib/site-packages"
+  ],
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.useLibraryCodeForTypes": true,
+  "python.languageServer": "Pylance"
 }

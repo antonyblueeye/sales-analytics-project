@@ -23,8 +23,12 @@ def restore_database(backup_file):
     print(f"Starting database restore from: {backup_file}")
     
     # Команда psql
+    psql_path = r"C:\Program Files\PostgreSQL\18\bin\psql.exe"
+    if not os.path.exists(psql_path):
+        psql_path = "psql" # fallback
+        
     command = [
-        "psql",
+        psql_path,
         "--dbname", DB_URL,
         "--file", backup_file
     ]

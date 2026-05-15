@@ -17,10 +17,13 @@ def backup_database():
     print(f"Starting database backup to: {backup_file}")
     
     # Команда pg_dump
-    # Заметьте, что мы используем pg_dump, который должен быть установлен в системе
-    # и доступен через переменную среды PATH.
+    # Используем полный путь к версии 18, чтобы избежать конфликта версий
+    pg_dump_path = r"C:\Program Files\PostgreSQL\18\bin\pg_dump.exe"
+    if not os.path.exists(pg_dump_path):
+        pg_dump_path = "pg_dump" # fallback to PATH
+        
     command = [
-        "pg_dump",
+        pg_dump_path,
         "--dbname", DB_URL,
         "--file", backup_file,
         "--format=p",  # Plain text SQL format (удобно для чтения и восстановления)

@@ -1,11 +1,13 @@
-import httpx, hashlib
+import httpx # type: ignore
+import hashlib
 from typing import List, Dict, Any
 from dateutil import parser
 from models import Lead, Campaign, Action
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session # type: ignore
 from crud import upsert_campaign, upsert_lead, upsert_action   # импортируем функцию из корневого crud.py
 
 BASE_URL = "https://meetalfred.com/api/integrations/webhook"
+TIMEOUT = 60.0  # Увеличили таймаут до 60 секунд
 
 def make_action_external_id(lead_urn, campaign_key, created_at, desc, msg):
     # Объединяем все поля в одну строку через разделитель, например "|"
@@ -39,7 +41,7 @@ def fetch_campaigns(api_key: str, campaign_type: str = "active") -> List[Dict[st
     page = 1
     per_page = 100   # оптимальное количество записей на странице
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=TIMEOUT) as client:
         while True:
             params = {
                 "webhook_key": api_key,
@@ -74,7 +76,7 @@ def fetch_new_leads(api_key: str, page: int = 0, per_page: int = 100) -> List[Di
     all_actions = []
     current_page = page
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=TIMEOUT) as client:
         while True:
             params = {
                 "webhook_key": api_key,
@@ -108,7 +110,7 @@ def fetch_actions(api_key: str, action_type: str, page: int = 0, per_page: int =
     all_actions = []
     current_page = page
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=TIMEOUT) as client:
         while True:
             params = {
                 "webhook_key": api_key,
