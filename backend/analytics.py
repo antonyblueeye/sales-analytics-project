@@ -466,3 +466,273 @@ def get_custom_messages_analytics(db: Session, mode: str = 'replied', profile_na
         for row in result
     ]
 
+def get_leads_analytics(db: Session, campaign_name: str = "all"):
+    from collections import defaultdict
+    
+    title_mapping = {
+        "Chief Executive Officer": "CEO",
+        "Chief Technology Officer": "CTO",
+        "Chief Operation Officer": "COO",
+        "Chief Operating Officer": "COO",
+        "Chief Financial Officer": "CFO",
+        "Chief Marketing Officer": "CMO",
+        "Vice President": "VP",
+        "President": "President",
+        "Founder": "Founder",
+        "Co-Founder": "Co-Founder",
+        "Managing Director": "MD",
+        "Human Resources": "HR",
+    }
+    
+    query = db.query(Lead.current_title, func.count(Lead.id).label('amount'))
+    
+    if campaign_name and campaign_name != "all":
+        # Find campaign_ids matching clean_campaign or exact name
+        res = db.execute(text("""
+            SELECT id FROM campaigns 
+            WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
+        """), {"name": campaign_name})
+        campaign_ids = [row[0] for row in res]
+        
+        if not campaign_ids:
+            res = db.execute(text("SELECT id FROM campaigns WHERE name = :name"), {"name": campaign_name})
+            campaign_ids = [row[0] for row in res]
+            
+        if campaign_ids:
+            # Join with Action to filter leads that have actions in these campaigns
+            query = query.join(Action, Lead.id == Action.lead_id).filter(Action.campaign_id.in_(campaign_ids))
+            
+    query = query.filter(Lead.current_title.isnot(None))\
+                 .filter(Lead.current_title != '')\
+                 .group_by(Lead.current_title)\
+                 .order_by(func.count(Lead.id).desc())
+                 
+    raw_results = query.all()
+    
+    # Aggregate with mapping
+    aggregated = defaultdict(int)
+    for row in raw_results:
+        title = row.current_title.strip()
+        if not title:
+            continue
+            
+        # Basic normalization for common acronyms if they appear in lowercase
+        lower_title = title.lower()
+        if lower_title in ["ceo", "cto", "coo", "cfo", "cmo", "vp", "hr", "md"]:
+            mapped_title = lower_title.upper()
+        else:
+            mapped_title = title.title()
+            
+        # Map if matches long forms
+        for key, val in title_mapping.items():
+            if key.lower() in lower_title:
+                mapped_title = val
+                break
+                
+        aggregated[mapped_title] += row.amount
+        
+    # Sort and take top 5
+    sorted_titles = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    return [
+        {"title": k, "count": v}
+        for k, v in sorted_titles
+    ]
+
+def get_replied_titles_analytics(db: Session, campaign_name: str = "all"):
+    from collections import defaultdict
+    
+    title_mapping = {
+        "Chief Executive Officer": "CEO",
+        "Chief Technology Officer": "CTO",
+        "Chief Operation Officer": "COO",
+        "Chief Operating Officer": "COO",
+        "Chief Financial Officer": "CFO",
+        "Chief Marketing Officer": "CMO",
+        "Vice President": "VP",
+        "President": "President",
+        "Founder": "Founder",
+        "Co-Founder": "Co-Founder",
+        "Managing Director": "MD",
+        "Human Resources": "HR",
+    }
+    
+    # We join Lead and Action from the start because we need action_type == 'replied'
+    query = db.query(Lead.current_title, func.count(Action.id).label('amount'))\
+              .join(Action, Lead.id == Action.lead_id)\
+              .filter(Action.action_type == 'replied')
+    
+    if campaign_name and campaign_name != "all":
+        # Find campaign_ids matching clean_campaign or exact name
+        res = db.execute(text("""
+            SELECT id FROM campaigns 
+            WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
+        """), {"name": campaign_name})
+        campaign_ids = [row[0] for row in res]
+        
+        if not campaign_ids:
+            res = db.execute(text("SELECT id FROM campaigns WHERE name = :name"), {"name": campaign_name})
+            campaign_ids = [row[0] for row in res]
+            
+        if campaign_ids:
+            query = query.filter(Action.campaign_id.in_(campaign_ids))
+            
+    query = query.filter(Lead.current_title.isnot(None))\
+                 .filter(Lead.current_title != '')\
+                 .group_by(Lead.current_title)\
+                 .order_by(func.count(Action.id).desc())
+                 
+    raw_results = query.all()
+    
+    # Aggregate with mapping
+    aggregated = defaultdict(int)
+    for row in raw_results:
+        title = row.current_title.strip()
+        if not title:
+            continue
+            
+        # Basic normalization for common acronyms if they appear in lowercase
+        lower_title = title.lower()
+        if lower_title in ["ceo", "cto", "coo", "cfo", "cmo", "vp", "hr", "md"]:
+            mapped_title = lower_title.upper()
+        else:
+            mapped_title = title.title()
+            
+        # Map if matches long forms
+        for key, val in title_mapping.items():
+            if key.lower() in lower_title:
+                mapped_title = val
+                break
+                
+        aggregated[mapped_title] += row.amount
+        
+    # Sort and take top 5
+    sorted_titles = sorted(aggregated.items(), key=lambda x: x[1], reverse=True)[:5]
+    
+    return [
+        {"title": k, "count": v}
+        for k, v in sorted_titles
+    ]
+
+def get_locations_analytics(db: Session, campaign_name: str = "all"):
+    import re
+    from collections import defaultdict
+    
+    query = db.query(Lead.location, func.count(Lead.id).label('amount'))
+    
+    if campaign_name and campaign_name != "all":
+        # Find campaign_ids matching clean_campaign or exact name
+        res = db.execute(text("""
+            SELECT id FROM campaigns 
+            WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
+        """), {"name": campaign_name})
+        campaign_ids = [row[0] for row in res]
+        
+        if not campaign_ids:
+            res = db.execute(text("SELECT id FROM campaigns WHERE name = :name"), {"name": campaign_name})
+            campaign_ids = [row[0] for row in res]
+            
+        if campaign_ids:
+            # Join with Action to filter leads that have actions in these campaigns
+            query = query.join(Action, Lead.id == Action.lead_id).filter(Action.campaign_id.in_(campaign_ids))
+            
+    query = query.filter(Lead.location.isnot(None))\
+                 .filter(Lead.location != '')\
+                 .group_by(Lead.location)
+                 
+    raw_results = query.all()
+    
+    countries_map = {
+        "united states": "United States of America",
+        "usa": "United States of America",
+        "u.s.": "United States of America",
+        "u.s.a": "United States of America",
+        "america": "United States of America",
+        "united kingdom": "United Kingdom",
+        "uk": "United Kingdom",
+        "u.k.": "United Kingdom",
+        "great britain": "United Kingdom",
+        "england": "United Kingdom",
+        "canada": "Canada",
+        "australia": "Australia",
+        "india": "India",
+        "germany": "Germany",
+        "france": "France",
+        "italy": "Italy",
+        "spain": "Spain",
+        "brazil": "Brazil",
+        "mexico": "Mexico",
+        "netherlands": "Netherlands",
+        "the netherlands": "Netherlands",
+        "sweden": "Sweden",
+        "poland": "Poland",
+        "ukraine": "Ukraine",
+        "russia": "Russia",
+        "china": "China",
+        "japan": "Japan",
+        "south korea": "South Korea",
+        "ireland": "Ireland",
+        "switzerland": "Switzerland",
+        "singapore": "Singapore",
+        "belgium": "Belgium",
+        "denmark": "Denmark",
+        "norway": "Norway",
+        "finland": "Finland",
+        "austria": "Austria",
+        "portugal": "Portugal",
+        "israel": "Israel",
+        "uae": "United Arab Emirates",
+        "united arab emirates": "United Arab Emirates",
+        "saudi arabia": "Saudi Arabia",
+        "south africa": "South Africa",
+        "argentina": "Argentina",
+        "colombia": "Colombia",
+        "chile": "Chile",
+        "new zealand": "New Zealand",
+        "philippines": "Philippines",
+        "indonesia": "Indonesia",
+        "malaysia": "Malaysia",
+        "vietnam": "Vietnam",
+        "thailand": "Thailand",
+        "turkey": "Turkey",
+        "egypt": "Egypt",
+        "pakistan": "Pakistan",
+        "bangladesh": "Bangladesh",
+        "nigeria": "Nigeria",
+        "kenya": "Kenya",
+        "romania": "Romania",
+        "czech republic": "Czechia",
+        "czechia": "Czechia",
+        "hungary": "Hungary",
+        "greece": "Greece"
+    }
+
+    aggregated = defaultdict(int)
+    
+    for row in raw_results:
+        loc = row.location.strip().lower()
+        if not loc:
+            continue
+            
+        found_country = None
+        loc_clean = re.sub(r'[^a-z\s]', ' ', loc)
+        words = set(loc_clean.split())
+        
+        # Check acronyms precisely
+        if "uk" in words and "ukraine" not in loc:
+            found_country = "United Kingdom"
+        elif "usa" in words or "us" in words:
+            found_country = "United States of America"
+        elif "uae" in words:
+            found_country = "United Arab Emirates"
+        else:
+            # Check longest phrases first
+            for key, val in sorted(countries_map.items(), key=lambda x: len(x[0]), reverse=True):
+                if key in loc:
+                    found_country = val
+                    break
+                    
+        if found_country:
+            aggregated[found_country] += row.amount
+            
+    return [{"location": k, "count": v} for k, v in aggregated.items()]

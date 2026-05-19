@@ -293,3 +293,27 @@ def custom_messages_analytics(
 ):
     from analytics import get_custom_messages_analytics
     return get_custom_messages_analytics(db, mode, profiles)
+
+@app.get("/analytics/leads")
+def leads_analytics(
+    campaign: str = "all",
+    db: Session = Depends(get_db)
+):
+    from analytics import get_leads_analytics
+    return get_leads_analytics(db, campaign)
+
+@app.get("/analytics/replied-leads-titles")
+def replied_leads_titles_analytics(
+    campaign: str = "all",
+    db: Session = Depends(get_db)
+):
+    from analytics import get_replied_titles_analytics
+    return get_replied_titles_analytics(db, campaign)
+
+@app.get("/analytics/locations")
+def locations_analytics(
+    campaign: str = "all",
+    db: Session = Depends(get_db)
+):
+    from analytics import get_locations_analytics
+    return get_locations_analytics(db, campaign)
