@@ -3,7 +3,7 @@ import { useState, useMemo, Fragment, ReactNode, useEffect, useCallback } from '
 import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import DateRangePicker from './components/DateRangePicker';
-import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus, Loader2, Sparkles } from 'lucide-react';
 import { 
   format, subDays, differenceInDays, startOfWeek, 
   subMonths, subYears, startOfMonth, endOfMonth, 
@@ -191,6 +191,27 @@ export default function Dashboard() {
   const [sortConfig, setSortConfig] = useState<{ key: ProfileKeys, direction: 'asc' | 'desc' } | null>(null);
   const [dailyData, setDailyData] = useState<any[]>([]);
   const [recentReplies, setRecentReplies] = useState<any[]>([]);
+  const [aiInsight, setAiInsight] = useState<string>('');
+  const [isInsightLoading, setIsInsightLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchInsight = async () => {
+      setIsInsightLoading(true);
+      setAiInsight('');
+      try {
+        const res = await axios.get('http://localhost:8000/analytics/ai-insights', {
+          params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
+        });
+        setAiInsight(res.data.insight);
+      } catch (err) {
+        console.error("AI Insight error", err);
+        setAiInsight("Unable to load insights at this time.");
+      } finally {
+        setIsInsightLoading(false);
+      }
+    };
+    fetchInsight();
+  }, [startDate, endDate]);
 
   // Функция для запроса данных из Python бэкенда
   const fetchProfiles = useCallback(async () => {
@@ -570,6 +591,34 @@ export default function Dashboard() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      </div>
+
+      {/* AI Insights Block */}
+      <div className="relative bg-gradient-to-r from-indigo-900/40 to-slate-900/80 border border-indigo-500/30 rounded-2xl p-6 shadow-xl overflow-hidden backdrop-blur-xl">
+        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-indigo-500 to-purple-500"></div>
+        <div className="flex gap-4 items-start relative z-10">
+          <div className="mt-1 p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+            <Sparkles size={20} className={isInsightLoading ? 'animate-pulse' : ''} />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-indigo-100 flex items-center gap-2 mb-2">
+              AI Performance Insights
+              {isInsightLoading && <span className="text-xs font-normal text-indigo-300 animate-pulse bg-indigo-500/10 px-2 py-0.5 rounded-full">Analyzing data...</span>}
+            </h3>
+            <div className="text-sm text-slate-300 leading-relaxed min-h-[40px] prose prose-invert max-w-none">
+              {isInsightLoading ? (
+                <div className="space-y-2 mt-2">
+                  <div className="h-4 bg-slate-700/50 rounded animate-pulse w-full"></div>
+                  <div className="h-4 bg-slate-700/50 rounded animate-pulse w-5/6"></div>
+                </div>
+              ) : (
+                aiInsight.split('\n').map((line, i) => (
+                    <p key={i} className="mb-2 last:mb-0" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-200 font-bold">$1</strong>') }} />
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
 

@@ -317,3 +317,28 @@ def locations_analytics(
 ):
     from analytics import get_locations_analytics
     return get_locations_analytics(db, campaign)
+
+@app.get("/analytics/ai-insights")
+def ai_insights(
+    from_date: date,
+    to_date: date,
+    db: Session = Depends(get_db)
+):
+    from analytics import get_profiles_summary, get_total_leads, get_total_actions
+    from datetime import datetime, time
+    from services.ai_service import generate_profiles_insight
+    
+    # Get the raw data
+    profiles_data = get_profiles_summary(db, from_date, to_date)
+    
+    # Convert dates to datetime for get_total_*
+    from_dt = datetime.combine(from_date, time.min)
+    to_dt = datetime.combine(to_date, time.max)
+    
+    total_leads_val = get_total_leads(db, from_dt, to_dt)
+    total_actions_val = get_total_actions(db, from_dt, to_dt)
+    
+    # Generate insight
+    insight_text = generate_profiles_insight(profiles_data, total_leads_val, total_actions_val)
+    
+    return {"insight": insight_text}
