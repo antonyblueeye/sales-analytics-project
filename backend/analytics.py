@@ -12,12 +12,13 @@ from sqlalchemy import and_, func
 from datetime import datetime, date, timedelta
 from collections import defaultdict
 import time
+from typing import Optional, Any
 
 # Simple global cache to store expensive analytics results
 _analytics_cache = {}
 CACHE_TTL = 300  # 5 minutes in seconds
 
-def get_total_actions(db: Session, from_date: datetime = None, to_date: datetime = None) -> int:
+def get_total_actions(db: Session, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> int:
     query = db.query(Action)
     if from_date:
         query = query.filter(Action.performed_at >= from_date)
@@ -25,7 +26,7 @@ def get_total_actions(db: Session, from_date: datetime = None, to_date: datetime
         query = query.filter(Action.performed_at < to_date)
     return query.count()
 
-def get_total_leads(db: Session, from_date: datetime = None, to_date: datetime = None) -> int:
+def get_total_leads(db: Session, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> int:
     query = db.query(Lead)
     if from_date:
         query = query.filter(Lead.created_at >= from_date)
@@ -242,7 +243,7 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
         for row in results
     ]
 
-def get_campaign_sequence(db: Session, campaign_name: str = None):
+def get_campaign_sequence(db: Session, campaign_name: Optional[str] = None):
     """
     Returns top message templates. 
     If campaign_name is 'ALL_CAMPAIGNS' or None, aggregates across all campaigns (Sent > 100).
@@ -347,7 +348,7 @@ def get_campaign_sequence(db: Session, campaign_name: str = None):
 
     return final_results
 
-def get_custom_messages_analytics(db: Session, mode: str = 'replied', profile_names: list = None):
+def get_custom_messages_analytics(db: Session, mode: str = 'replied', profile_names: Optional[list[Any]] = None):
     """
     Returns analytics for custom messages.
     mode: 'replied' or 'accepted'

@@ -71,23 +71,67 @@ interface DatePickerButtonProps {
     popoverAlignment?: 'left' | 'right';
 }
 
+import { createPortal } from 'react-dom';
+
 const DatePickerButton = ({ date, onSelect, label, className, popoverDirection = 'down', popoverAlignment = 'right' }: DatePickerButtonProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+
+    const handleOpen = () => {
+        if (ref.current) {
+            setRect(ref.current.getBoundingClientRect());
+        }
+        setIsOpen(!isOpen);
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (ref.current && !ref.current.contains(event.target as Node)) setIsOpen(false);
+            if (ref.current && !ref.current.contains(event.target as Node)) {
+                const target = event.target as Element;
+                if (!target.closest('.date-picker-portal-content')) {
+                    setIsOpen(false);
+                }
+            }
         };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        
+        const handleScroll = (e: Event) => {
+            const target = e.target as Element;
+            if (target && target.closest && target.closest('.date-picker-portal-content')) return;
+            setIsOpen(false);
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            window.addEventListener('scroll', handleScroll, true);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll, true);
+        };
     }, [isOpen]);
+
+    let popupTop = 0;
+    let popupLeft = 0;
+    if (rect) {
+        popupTop = rect.bottom + 8;
+        popupLeft = rect.left;
+        if (popupTop + 380 > window.innerHeight) {
+            popupTop = rect.top - 380 - 8;
+        }
+        if (popupTop < 10) popupTop = 10;
+        
+        if (popupLeft + 320 > window.innerWidth) {
+            popupLeft = window.innerWidth - 320 - 16;
+        }
+        if (popupLeft < 10) popupLeft = 10;
+    }
 
     return (
         <div className={`relative ${className}`} ref={ref}>
             <div className="relative group">
                 <button
-                    onClick={() => setIsOpen(!isOpen)}
+                    onClick={handleOpen}
                     className="w-full flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 hover:border-slate-500 transition-all focus:ring-1 focus:ring-indigo-500 outline-none h-[30px] pr-8"
                 >
                     <CalendarIcon size={14} className="text-indigo-400 shrink-0" />
@@ -106,11 +150,17 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                 )}
             </div>
 
-            {isOpen && (
+            {isOpen && rect && createPortal(
                 <div
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${popoverAlignment === 'right' ? 'right-0' : 'left-0'} z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
+                    style={{
+                        position: 'fixed',
+                        top: popupTop,
+                        left: popupLeft,
+                        zIndex: 999999,
+                    }}
+                    className={`date-picker-portal-content bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 w-auto min-w-[300px]`}
                 >
                     <style dangerouslySetInnerHTML={{
                         __html: `
@@ -127,6 +177,23 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                         .rdp-button_nav:hover { background-color: #334155; color: white; }
                         .rdp-caption_label { font-weight: 600; font-size: 14px; color: #f8fafc; }
                         .rdp-weekday { color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 600; }
+                        
+                        /* Dropdowns for Year and Month */
+                        .rdp-caption_dropdowns { display: flex; gap: 6px; align-items: center; justify-content: center; }
+                        .rdp-dropdown, select.rdp-dropdown, .rdp-caption_dropdowns select { 
+                            background: #1e293b; color: #f8fafc; 
+                            border: 1px solid #334155; border-radius: 6px; 
+                            padding: 2px 6px; font-size: 13px; font-weight: 600;
+                            cursor: pointer; outline: none;
+                        }
+                        .rdp-dropdown:hover, .rdp-caption_dropdowns select:hover { border-color: #475569; background: #334155; }
+                        .rdp-dropdown option, .rdp-caption_dropdowns select option { background: #1e293b; color: #f8fafc; }
+                        
+                        /* Fix v9 dropdown labels */
+                        .rdp-dropdown_month, .rdp-dropdown_year { display: flex; align-items: center; gap: 4px; }
+                        
+                        /* Hidden elements for screen readers should not break layout */
+                        .rdp-vhidden { border: 0; clip: rect(0 0 0 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; }
                     `}} />
                     <DayPicker
                         mode="single"
@@ -134,18 +201,25 @@ const DatePickerButton = ({ date, onSelect, label, className, popoverDirection =
                         onSelect={(d) => {
                             if (d) {
                                 onSelect(format(d, 'yyyy-MM-dd'));
+                                setIsOpen(false);
                             }
                         }}
+                        showOutsideDays
+                        fixedWeeks
+                        captionLayout="dropdown"
+                        startMonth={new Date(2020, 0)}
+                        endMonth={new Date(new Date().getFullYear() + 2, 11)}
                     />
                     <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
                         <button
                             onClick={() => setIsOpen(false)}
-                            className="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 transition-colors"
+                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shadow-lg shadow-indigo-600/20"
                         >
                             Done
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
@@ -163,14 +237,56 @@ interface DateRangePickerButtonProps {
 const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirection = 'down', popoverAlignment = 'right' }: DateRangePickerButtonProps) => {
     const [isOpen, setIsOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
+    const [rect, setRect] = useState<DOMRect | null>(null);
+
+    const handleOpen = () => {
+        if (ref.current) {
+            setRect(ref.current.getBoundingClientRect());
+        }
+        setIsOpen(!isOpen);
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (ref.current && !ref.current.contains(event.target as Node)) setIsOpen(false);
+            if (ref.current && !ref.current.contains(event.target as Node)) {
+                const target = event.target as Element;
+                if (!target.closest('.date-picker-portal-content')) {
+                    setIsOpen(false);
+                }
+            }
         };
-        if (isOpen) document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+
+        const handleScroll = (e: Event) => {
+            const target = e.target as Element;
+            if (target && target.closest && target.closest('.date-picker-portal-content')) return;
+            setIsOpen(false);
+        };
+
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            window.addEventListener('scroll', handleScroll, true);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            window.removeEventListener('scroll', handleScroll, true);
+        };
     }, [isOpen]);
+
+    let popupTop = 0;
+    let popupLeft = 0;
+    if (rect) {
+        popupTop = rect.bottom + 8;
+        popupLeft = rect.left;
+        if (popupTop + 380 > window.innerHeight) {
+            popupTop = rect.top - 380 - 8;
+        }
+        if (popupTop < 10) popupTop = 10;
+        
+        if (popupLeft + 320 > window.innerWidth) {
+            popupLeft = window.innerWidth - 320 - 16;
+        }
+        if (popupLeft < 10) popupLeft = 10;
+    }
 
     const displayText = () => {
         if (!range?.from) return label || 'Select range';
@@ -182,7 +298,7 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
         <div className={`relative ${className}`} ref={ref}>
             <div className="relative group">
                 <button
-                    onClick={() => setIsOpen(!isOpen)}
+                    onClick={handleOpen}
                     className="w-full flex items-center gap-2 bg-slate-900 border border-slate-700 rounded-xl px-3 py-1.5 text-xs text-slate-200 hover:border-slate-500 transition-all focus:ring-1 focus:ring-indigo-500 outline-none h-[30px] pr-8"
                 >
                     <CalendarIcon size={14} className="text-indigo-400 shrink-0" />
@@ -201,11 +317,17 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
                 )}
             </div>
 
-            {isOpen && (
+            {isOpen && rect && createPortal(
                 <div
                     onClick={(e) => e.stopPropagation()}
                     onMouseDown={(e) => e.stopPropagation()}
-                    className={`absolute ${popoverDirection === 'up' ? 'bottom-full mb-2' : 'top-full mt-2'} ${popoverAlignment === 'right' ? 'right-0' : 'left-0'} z-[120] bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200`}
+                    style={{
+                        position: 'fixed',
+                        top: popupTop,
+                        left: popupLeft,
+                        zIndex: 999999,
+                    }}
+                    className={`date-picker-portal-content bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl p-4 animate-in fade-in zoom-in-95 duration-200 w-auto min-w-[300px]`}
                 >
                     <style dangerouslySetInnerHTML={{
                         __html: `
@@ -222,11 +344,33 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
                         .rdp-button_nav:hover { background-color: #334155; color: white; }
                         .rdp-caption_label { font-weight: 600; font-size: 14px; color: #f8fafc; }
                         .rdp-weekday { color: #64748b; font-size: 11px; text-transform: uppercase; font-weight: 600; }
+                        
+                        /* Dropdowns for Year and Month */
+                        .rdp-caption_dropdowns { display: flex; gap: 6px; align-items: center; justify-content: center; }
+                        .rdp-dropdown, select.rdp-dropdown, .rdp-caption_dropdowns select { 
+                            background: #1e293b; color: #f8fafc; 
+                            border: 1px solid #334155; border-radius: 6px; 
+                            padding: 2px 6px; font-size: 13px; font-weight: 600;
+                            cursor: pointer; outline: none;
+                        }
+                        .rdp-dropdown:hover, .rdp-caption_dropdowns select:hover { border-color: #475569; background: #334155; }
+                        .rdp-dropdown option, .rdp-caption_dropdowns select option { background: #1e293b; color: #f8fafc; }
+                        
+                        /* Fix v9 dropdown labels */
+                        .rdp-dropdown_month, .rdp-dropdown_year { display: flex; align-items: center; gap: 4px; }
+                        
+                        /* Hidden elements for screen readers should not break layout */
+                        .rdp-vhidden { border: 0; clip: rect(0 0 0 0); height: 1px; margin: -1px; overflow: hidden; padding: 0; position: absolute; width: 1px; }
                     `}} />
                     <DayPicker
                         mode="range"
                         selected={range}
                         onSelect={onSelect}
+                        showOutsideDays
+                        fixedWeeks
+                        captionLayout="dropdown"
+                        startMonth={new Date(2020, 0)}
+                        endMonth={new Date(new Date().getFullYear() + 2, 11)}
                     />
                     <div className="mt-4 pt-4 border-t border-slate-800 flex justify-end">
                         <button
@@ -236,7 +380,8 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
                             Apply
                         </button>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

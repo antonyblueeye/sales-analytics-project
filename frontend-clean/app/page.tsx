@@ -4,10 +4,10 @@ import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import DateRangePicker from './components/DateRangePicker';
 import { ChevronDown, ChevronRight, ArrowUpDown, ArrowDown, ArrowUp, Minus, Loader2, Sparkles } from 'lucide-react';
-import { 
-  format, subDays, differenceInDays, startOfWeek, 
-  subMonths, subYears, startOfMonth, endOfMonth, 
-  startOfYear, endOfYear, isSameDay 
+import {
+  format, subDays, differenceInDays, startOfWeek,
+  subMonths, subYears, startOfMonth, endOfMonth,
+  startOfYear, endOfYear, isSameDay
 } from 'date-fns';
 import axios from 'axios';
 
@@ -54,21 +54,21 @@ interface StatCellProps {
 // Utility to calculate semantic previous period
 const getPreviousPeriod = (startDate: Date, endDate: Date) => {
   const duration = differenceInDays(endDate, startDate) + 1;
-  
+
   // 1. Check if it's a full month selection
   const isStartOfMonth = startDate.getDate() === 1;
   const isEndOfMonth = isSameDay(endDate, endOfMonth(startDate));
-  
+
   if (isStartOfMonth && isEndOfMonth) {
     const prevMonthStart = startOfMonth(subMonths(startDate, 1));
     const prevMonthEnd = endOfMonth(prevMonthStart);
     return { start: prevMonthStart, end: prevMonthEnd };
   }
-  
+
   // 2. Check if it's a full year selection
   const isStartOfYear = startDate.getMonth() === 0 && startDate.getDate() === 1;
   const isEndOfYear = isSameDay(endDate, endOfYear(startDate));
-  
+
   if (isStartOfYear && isEndOfYear) {
     const prevYearStart = startOfYear(subYears(startDate, 1));
     const prevYearEnd = endOfYear(prevYearStart);
@@ -77,9 +77,9 @@ const getPreviousPeriod = (startDate: Date, endDate: Date) => {
 
   // 3. Handle Year-to-Date (This Year preset)
   if (isStartOfYear && isSameDay(endDate, new Date())) {
-    return { 
-      start: startOfYear(subYears(startDate, 1)), 
-      end: subYears(endDate, 1) 
+    return {
+      start: startOfYear(subYears(startDate, 1)),
+      end: subYears(endDate, 1)
     };
   }
 
@@ -143,18 +143,16 @@ const StatCell = ({ value, previousValue, isPercentage, startDate, endDate, cust
           <span className="text-sm font-semibold text-white">
             {previousValue}{isPercentage ? '%' : ''}
           </span>
-          <div className={`flex items-center gap-1 text-xs font-bold ${
-            trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400'
-          }`}>
+          <div className={`flex items-center gap-1 text-xs font-bold ${trend === 'up' ? 'text-emerald-400' : trend === 'down' ? 'text-rose-400' : 'text-slate-400'
+            }`}>
             {trend === 'up' ? '+' : ''}
             {isPercentage ? diff.toFixed(1) : diff}
             {isPercentage ? '%' : ''}
           </div>
         </div>
       </div>
-      <div className={`w-2 h-2 bg-slate-800 border-slate-700 rotate-45 absolute ${
-        showBelow ? '-top-1 border-l border-t' : '-bottom-1 border-r border-b'
-      } left-[88px]`} />
+      <div className={`w-2 h-2 bg-slate-800 border-slate-700 rotate-45 absolute ${showBelow ? '-top-1 border-l border-t' : '-bottom-1 border-r border-b'
+        } left-[88px]`} />
     </div>
   ) : null;
 
@@ -194,23 +192,25 @@ export default function Dashboard() {
   const [aiInsight, setAiInsight] = useState<string>('');
   const [isInsightLoading, setIsInsightLoading] = useState(false);
 
+  // Сбрасываем предыдущий инсайт при смене дат, чтобы не показывать устаревший
   useEffect(() => {
-    const fetchInsight = async () => {
-      setIsInsightLoading(true);
-      setAiInsight('');
-      try {
-        const res = await axios.get('http://localhost:8000/analytics/ai-insights', {
-          params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
-        });
-        setAiInsight(res.data.insight);
-      } catch (err) {
-        console.error("AI Insight error", err);
-        setAiInsight("Unable to load insights at this time.");
-      } finally {
-        setIsInsightLoading(false);
-      }
-    };
-    fetchInsight();
+    setAiInsight('');
+  }, [startDate, endDate]);
+
+  const fetchInsight = useCallback(async () => {
+    setIsInsightLoading(true);
+    setAiInsight('');
+    try {
+      const res = await axios.get('http://localhost:8000/analytics/ai-insights', {
+        params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
+      });
+      setAiInsight(res.data.insight);
+    } catch (err) {
+      console.error("AI Insight error", err);
+      setAiInsight("Unable to load insights at this time.");
+    } finally {
+      setIsInsightLoading(false);
+    }
   }, [startDate, endDate]);
 
   // Функция для запроса данных из Python бэкенда
@@ -602,20 +602,41 @@ export default function Dashboard() {
             <Sparkles size={20} className={isInsightLoading ? 'animate-pulse' : ''} />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-bold text-indigo-100 flex items-center gap-2 mb-2">
-              AI Performance Insights
-              {isInsightLoading && <span className="text-xs font-normal text-indigo-300 animate-pulse bg-indigo-500/10 px-2 py-0.5 rounded-full">Analyzing data...</span>}
-            </h3>
+            <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+              <h3 className="text-lg font-bold text-indigo-100 flex items-center gap-2">
+                AI Performance Insights
+                {isInsightLoading && <span className="text-xs font-normal text-indigo-300 animate-pulse bg-indigo-500/10 px-2 py-0.5 rounded-full">Analyzing data...</span>}
+              </h3>
+              <button
+                onClick={fetchInsight}
+                disabled={isInsightLoading}
+                className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-100 border border-indigo-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isInsightLoading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    {aiInsight ? 'Regenerate' : 'Generate Insight'}
+                  </>
+                )}
+              </button>
+            </div>
             <div className="text-sm text-slate-300 leading-relaxed min-h-[40px] prose prose-invert max-w-none">
               {isInsightLoading ? (
                 <div className="space-y-2 mt-2">
                   <div className="h-4 bg-slate-700/50 rounded animate-pulse w-full"></div>
                   <div className="h-4 bg-slate-700/50 rounded animate-pulse w-5/6"></div>
                 </div>
-              ) : (
+              ) : aiInsight ? (
                 aiInsight.split('\n').map((line, i) => (
-                    <p key={i} className="mb-2 last:mb-0" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-200 font-bold">$1</strong>') }} />
+                  <p key={i} className="mb-2 last:mb-0" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-200 font-bold">$1</strong>') }} />
                 ))
+              ) : (
+                <p className="text-slate-400 italic">Click <span className="font-semibold text-indigo-300">Generate Insight</span> to get an AI-powered summary for the selected date range.</p>
               )}
             </div>
           </div>
