@@ -13,7 +13,7 @@ from models import Base, Campaign, Profile, Lead, Action
 from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history, get_recent_replies, get_funnel_history
 from typing import Optional
 from datetime import datetime, time, timedelta, date
-from crm import get_leads_list, get_replied_leads, get_lead_activities
+from crm import get_leads_list, get_replied_leads, get_lead_activities, get_lead_by_id, search_leads
 
 app = FastAPI()
 
@@ -229,6 +229,16 @@ def crm_replied_leads(
         campaign, status
     )
     return data
+
+@app.get("/crm/leads/search")
+def crm_search_leads(q: str = "", limit: int = 5, db: Session = Depends(get_db)):
+    if not q or len(q.strip()) < 2:
+        return []
+    return search_leads(db, q.strip(), limit)
+
+@app.get("/crm/leads/{lead_id}")
+def crm_lead_by_id(lead_id: int, db: Session = Depends(get_db)):
+    return get_lead_by_id(db, lead_id)
 
 @app.get("/crm/leads/{lead_id}/activities")
 def crm_lead_activities(

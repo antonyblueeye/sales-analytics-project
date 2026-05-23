@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
+import { useRouter } from 'next/navigation';
 import { DayPicker, DateRange } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
 import 'react-day-picker/dist/style.css';
@@ -528,6 +529,7 @@ export default function CRMPage() {
     const [isLoading, setIsLoading] = useState(false);
 
     // ... rest of the original states ...
+    const router = useRouter();
     const [search, setSearch] = useState('');
     const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
     const [activeLead, setActiveLead] = useState<Lead | null>(null);
@@ -1388,12 +1390,21 @@ export default function CRMPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={handleCloseDrawer}
-                                    className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    <button
+                                        onClick={() => activeLead?.id && router.push(`/crm/${activeLead.id}`)}
+                                        className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+                                        title="Open full page"
+                                    >
+                                        <ExternalLink size={18} />
+                                    </button>
+                                    <button
+                                        onClick={handleCloseDrawer}
+                                        className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+                                    >
+                                        <X size={20} />
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Drawer Content */}

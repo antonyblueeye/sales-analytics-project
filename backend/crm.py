@@ -407,6 +407,113 @@ def get_lead_activities(db: Session, lead_id: int):
         })
     return {"activities": activities}
 
+def get_lead_by_id(db: Session, lead_id: int):
+    query = text("""
+        SELECT
+            l.id,
+            coalesce(l.first_name, '') as first_name,
+            coalesce(l.last_name, '') as last_name,
+            coalesce(CASE WHEN l.work_email LIKE '%@%' THEN l.work_email ELSE '' END, '') as email,
+            coalesce(l.linkedin_url, '') as linkedin_url,
+            coalesce(l.photo_url, '') as photo_url,
+            coalesce(l.current_employer, '') as company_name,
+            coalesce(l.current_title, '') as title,
+            coalesce(l.location, '') as location,
+            COALESCE(st.status, 'New') as status,
+            COALESCE(st.campaign_names, ARRAY[]::text[]) as campaign_names,
+            COALESCE(st.profile_names, ARRAY[]::text[]) as profile_names,
+            COALESCE(st.first_action_at, l.created_at) as created_at
+        FROM leads l
+        LEFT JOIN (
+            SELECT a.lead_id,
+                   MIN(a.performed_at) as first_action_at,
+                   CASE
+                WHEN COUNT(CASE WHEN a.action_type = 'client'    THEN 1 END) > 0 THEN 'Client'
+                WHEN COUNT(CASE WHEN a.action_type = 'partner'   THEN 1 END) > 0 THEN 'Partner'
+                WHEN COUNT(CASE WHEN a.action_type = 'sql'       THEN 1 END) > 0 THEN 'SQL'
+                WHEN COUNT(CASE WHEN a.action_type = 'mql'       THEN 1 END) > 0 THEN 'MQL'
+                WHEN COUNT(CASE WHEN a.action_type = 'interested' THEN 1 END) > 0 THEN 'Interested'
+                WHEN COUNT(CASE WHEN a.action_type = 'replied'   THEN 1 END) > 0 THEN 'Engaged'
+                WHEN COUNT(CASE WHEN a.action_type = 'accepted'  THEN 1 END) > 0 THEN 'Connected'
+                WHEN COUNT(CASE WHEN a.action_type = 'invited'   THEN 1 END) > 0 THEN 'Pending'
+                ELSE 'New'
+            END as status,
+                   array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
+                   array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
+            FROM actions a
+            LEFT JOIN campaigns c ON a.campaign_id = c.id
+            LEFT JOIN profiles p ON a.profile_id = p.id
+            GROUP BY a.lead_id
+        ) st ON l.id = st.lead_id
+        WHERE l.id = :lead_id
+    """)
+    result = db.execute(query, {"lead_id": lead_id}).first()
+    if not result:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    row = dict(result._mapping)
+    if row.get('created_at') and isinstance(row['created_at'], (date, datetime)):
+        row['created_at'] = row['created_at'].isoformat()
+    row['campaign_names'] = row.get('campaign_names') or []
+    row['profile_names'] = row.get('profile_names') or []
+
+    # fetch messages
+    msg_q = text("""
+        SELECT a.message, a.action_type, a.performed_at, p.name as profile_name
+        FROM actions a
+        LEFT JOIN profiles p ON a.profile_id = p.id
+        WHERE a.lead_id = :lead_id AND a.message <> ''
+        ORDER BY a.performed_at ASC
+    """)
+    msgs = []
+    for r in db.execute(msg_q, {"lead_id": lead_id}):
+        rm = r._mapping
+        msgs.append({
+            "role": "lead" if rm['action_type'] == 'replied' else "me",
+            "text": rm['message'],
+            "profile_name": rm['profile_name'] or 'Unknown',
+            "timestamp": rm['performed_at'].strftime('%H:%M %d.%m.%Y') if rm['performed_at'] else ''
+        })
+    row['messages'] = msgs
+    return row
+
+
+def search_leads(db: Session, q: str, limit: int = 5):
+    query = text("""
+        SELECT
+            l.id,
+            coalesce(l.first_name, '') as first_name,
+            coalesce(l.last_name, '') as last_name,
+            coalesce(l.current_employer, '') as company_name,
+            coalesce(l.current_title, '') as title,
+            coalesce(l.photo_url, '') as photo_url,
+            COALESCE(st.status, 'New') as status
+        FROM leads l
+        LEFT JOIN (
+            SELECT a.lead_id,
+                   CASE
+                WHEN COUNT(CASE WHEN a.action_type = 'client'    THEN 1 END) > 0 THEN 'Client'
+                WHEN COUNT(CASE WHEN a.action_type = 'partner'   THEN 1 END) > 0 THEN 'Partner'
+                WHEN COUNT(CASE WHEN a.action_type = 'sql'       THEN 1 END) > 0 THEN 'SQL'
+                WHEN COUNT(CASE WHEN a.action_type = 'mql'       THEN 1 END) > 0 THEN 'MQL'
+                WHEN COUNT(CASE WHEN a.action_type = 'interested' THEN 1 END) > 0 THEN 'Interested'
+                WHEN COUNT(CASE WHEN a.action_type = 'replied'   THEN 1 END) > 0 THEN 'Engaged'
+                WHEN COUNT(CASE WHEN a.action_type = 'accepted'  THEN 1 END) > 0 THEN 'Connected'
+                WHEN COUNT(CASE WHEN a.action_type = 'invited'   THEN 1 END) > 0 THEN 'Pending'
+                ELSE 'New'
+            END as status
+            FROM actions a GROUP BY a.lead_id
+        ) st ON l.id = st.lead_id
+        WHERE
+            l.first_name ILIKE :q OR
+            l.last_name ILIKE :q OR
+            (l.first_name || ' ' || l.last_name) ILIKE :q OR
+            l.current_employer ILIKE :q
+        LIMIT :limit
+    """)
+    rows = db.execute(query, {"q": f"%{q}%", "limit": limit})
+    return [dict(r._mapping) for r in rows]
+
+
 def add_lead_activity(db: Session, lead_id: int, activity_data):
     # Try exact match first
     campaign = db.query(Campaign).filter(Campaign.name == activity_data.campaign_name).first()

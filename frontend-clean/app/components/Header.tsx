@@ -1,6 +1,7 @@
 'use client';
-import { Search, Bell, RefreshCw, Sparkles, X, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Bell, RefreshCw, Sparkles, X, Clock, ChevronDown, ChevronUp, User } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import axios from 'axios';
 
 const INSIGHTS_STORAGE_KEY = 'ai:insights:history';
@@ -24,8 +25,31 @@ export function saveInsightToHistory(entry: Omit<InsightEntry, 'id'>) {
     } catch {}
 }
 
+interface SearchResult {
+    id: number;
+    first_name: string;
+    last_name: string;
+    company_name: string;
+    title: string;
+    photo_url: string;
+    status: string;
+}
+
+const searchStatusColors: Record<string, string> = {
+    'New': 'text-slate-400', 'Pending': 'text-yellow-400', 'Connected': 'text-emerald-400',
+    'Engaged': 'text-blue-400', 'Interested': 'text-indigo-400', 'MQL': 'text-amber-400',
+    'SQL': 'text-orange-400', 'Partner': 'text-rose-400', 'Client': 'text-green-400',
+};
+
 export default function Header() {
+    const router = useRouter();
     const [searchQuery, setSearchQuery] = useState('');
+    const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [searchLoading, setSearchLoading] = useState(false);
+    const searchRef = useRef<HTMLDivElement>(null);
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     const [lastSync, setLastSync] = useState<string | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
     const [insights, setInsights] = useState<InsightEntry[]>([]);
@@ -38,6 +62,46 @@ export default function Header() {
             .then(res => setLastSync(res.data.last_synced_at))
             .catch(() => {});
     }, []);
+
+    // Search debounce
+    useEffect(() => {
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+        if (searchQuery.trim().length < 2) {
+            setSearchResults([]);
+            setSearchOpen(false);
+            return;
+        }
+        searchDebounceRef.current = setTimeout(async () => {
+            setSearchLoading(true);
+            try {
+                const res = await axios.get('http://localhost:8000/crm/leads/search', {
+                    params: { q: searchQuery.trim(), limit: 3 }
+                });
+                setSearchResults(res.data);
+                setSearchOpen(res.data.length > 0);
+            } catch {}
+            finally { setSearchLoading(false); }
+        }, 280);
+    }, [searchQuery]);
+
+    // Close search on outside click
+    useEffect(() => {
+        if (!searchOpen) return;
+        const handler = (e: MouseEvent) => {
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setSearchOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [searchOpen]);
+
+    const goToLead = (id: number) => {
+        setSearchQuery('');
+        setSearchOpen(false);
+        setSearchResults([]);
+        router.push(`/crm/${id}`);
+    };
 
     const loadInsights = () => {
         try {
@@ -113,15 +177,51 @@ export default function Header() {
 
     return (
         <header className="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/50 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-            <div className="relative w-full max-w-md">
-                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+            <div className="relative w-full max-w-md" ref={searchRef}>
+                <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
+                {searchLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+                )}
                 <input
                     type="text"
-                    placeholder="Search leads, campaigns, or activities..."
+                    placeholder="Search leads by name or company..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-slate-700 rounded-xl bg-slate-900/50 text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
+                    onFocus={() => { if (searchResults.length > 0) setSearchOpen(true); }}
+                    className="w-full pl-10 pr-8 py-2 border border-slate-700 rounded-xl bg-slate-900/50 text-slate-200 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
                 />
+
+                {/* Suggestions dropdown */}
+                {searchOpen && searchResults.length > 0 && (
+                    <div className="absolute left-0 right-0 top-[calc(100%+6px)] bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                        {searchResults.map((r) => {
+                            const initials = `${r.first_name?.[0] || ''}${r.last_name?.[0] || ''}`.toUpperCase();
+                            const statusColor = searchStatusColors[r.status] || 'text-slate-400';
+                            return (
+                                <button
+                                    key={r.id}
+                                    onClick={() => goToLead(r.id)}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800 transition-colors text-left group"
+                                >
+                                    {r.photo_url ? (
+                                        <img src={r.photo_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                    ) : (
+                                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                            {initials}
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-slate-200 group-hover:text-white truncate">
+                                            {r.first_name} {r.last_name}
+                                        </p>
+                                        <p className="text-xs text-slate-500 truncate">{r.company_name}{r.title ? ` · ${r.title}` : ''}</p>
+                                    </div>
+                                    <span className={`text-[10px] font-bold shrink-0 ${statusColor}`}>{r.status}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
 
             <div className="flex items-center gap-4">
