@@ -73,16 +73,19 @@ def get_leads_list(
         params["camp"] = f"%{campaign}%"
 
     if status:
-        if status.lower() == 'replied':
-            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied')")
-        elif status.lower() == 'connected':
-            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id) AND NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied')")
-        elif status.lower() == 'new':
+        s = status.lower()
+        if s == 'new':
             where_clauses.append("NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id)")
+        elif s == 'pending':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'invited') AND NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type IN ('accepted','replied','interested','mql','sql','partner','client'))")
+        elif s == 'connected':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'accepted') AND NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type IN ('replied','interested','mql','sql','partner','client'))")
+        elif s == 'engaged':
+            where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = 'replied') AND NOT EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type IN ('interested','mql','sql','partner','client'))")
         else:
             where_clauses.append("EXISTS (SELECT 1 FROM actions act WHERE act.lead_id = l.id AND act.action_type = :status_val)")
-            params["status_val"] = status.lower()
-        
+            params["status_val"] = s
+
     where_sql = ""
     if where_clauses:
         where_sql = "WHERE " + " AND ".join(where_clauses)
@@ -111,9 +114,17 @@ def get_leads_list(
         LEFT JOIN (
             SELECT a.lead_id, 
                    MIN(a.performed_at) as first_action_at,
-                   CASE WHEN COUNT(CASE WHEN a.action_type = 'replied' THEN 1 END) > 0 THEN 'Replied'
-                        WHEN COUNT(*) > 0 THEN 'Connected'
-                        ELSE 'New' END as status,
+                   CASE
+                WHEN COUNT(CASE WHEN a.action_type = 'client'    THEN 1 END) > 0 THEN 'Client'
+                WHEN COUNT(CASE WHEN a.action_type = 'partner'   THEN 1 END) > 0 THEN 'Partner'
+                WHEN COUNT(CASE WHEN a.action_type = 'sql'       THEN 1 END) > 0 THEN 'SQL'
+                WHEN COUNT(CASE WHEN a.action_type = 'mql'       THEN 1 END) > 0 THEN 'MQL'
+                WHEN COUNT(CASE WHEN a.action_type = 'interested' THEN 1 END) > 0 THEN 'Interested'
+                WHEN COUNT(CASE WHEN a.action_type = 'replied'   THEN 1 END) > 0 THEN 'Engaged'
+                WHEN COUNT(CASE WHEN a.action_type = 'accepted'  THEN 1 END) > 0 THEN 'Connected'
+                WHEN COUNT(CASE WHEN a.action_type = 'invited'   THEN 1 END) > 0 THEN 'Pending'
+                ELSE 'New'
+            END as status,
                    array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
                    array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
             FROM actions a
@@ -337,7 +348,7 @@ def get_replied_leads(
                 "company_name": r['company_name'],
                 "title": r['title'],
                 "location": r['location'],
-                "status": "Replied",
+                "status": "Engaged",
                 "campaign_names": list(r['campaign_names']) if r['campaign_names'] else [],
                 "profile_names": list(r['profile_names']) if r['profile_names'] else [],
                 "last_reply_at": last_reply.isoformat() if last_reply else None,

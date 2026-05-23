@@ -388,10 +388,15 @@ const DateRangePickerButton = ({ range, onSelect, label, className, popoverDirec
 };
 
 const statusColors: Record<string, string> = {
-    'Connected': 'bg-green-500/10 text-green-500 border-green-500/20',
-    'Interested': 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
-    'Replied': 'bg-blue-500/10 text-blue-500 border-blue-500/20',
-    'New': 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    'New':        'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    'Pending':    'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    'Connected':  'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    'Engaged':    'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    'Interested': 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+    'MQL':        'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    'SQL':        'bg-orange-500/10 text-orange-400 border-orange-500/20',
+    'Partner':    'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    'Client':     'bg-green-500/10 text-green-400 border-green-500/20',
 };
 
 // ─── Activity Timeline Item ──────────────────────────────────────────────────
@@ -533,7 +538,7 @@ export default function CRMPage() {
     const [selectedActivity, setSelectedActivity] = useState<string>('interested');
     const [isLoadingActivities, setIsLoadingActivities] = useState(false);
     const [activityDate, setActivityDate] = useState(new Date().toISOString().split('T')[0]);
-    const [activeTab, setActiveTab] = useState<'all' | 'replied'>('all');
+    const [activeTab, setActiveTab] = useState<'all' | 'replied' | 'call' | 'interested' | 'mql' | 'sql' | 'partner' | 'client'>('all');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null);
 
     // Add Lead modal
@@ -606,15 +611,28 @@ export default function CRMPage() {
     const fetchLeads = async (page: number, currentFilters: any = {}) => {
         setIsLoading(true);
         try {
-            const endpoint = activeTab === 'all'
-                ? 'http://localhost:8000/crm/leads'
-                : 'http://localhost:8000/crm/replied-leads';
+            const endpoint = activeTab === 'replied'
+                ? 'http://localhost:8000/crm/replied-leads'
+                : 'http://localhost:8000/crm/leads';
 
             // Build query params
             const params = new URLSearchParams({
                 page: page.toString(),
                 limit: '20'
             });
+
+            // For status-based tabs, inject status filter
+            const tabStatusMap: Record<string, string> = {
+                call: 'call',
+                interested: 'Interested',
+                mql: 'MQL',
+                sql: 'SQL',
+                partner: 'Partner',
+                client: 'Client',
+            };
+            if (tabStatusMap[activeTab] && !currentFilters.status) {
+                params.set('status', tabStatusMap[activeTab]);
+            }
 
             if (currentFilters.search) params.append('search', currentFilters.search);
             if (currentFilters.firstName) params.append('first_name', currentFilters.firstName);
@@ -638,7 +656,7 @@ export default function CRMPage() {
                 company: l.company_name,
                 title: l.title,
                 photo: l.photo_url || `https://ui-avatars.com/api/?name=${l.first_name}+${l.last_name}&background=6366f1&color=fff`,
-                status: activeTab === 'replied' ? 'Replied' : l.status,
+                status: l.status || 'New',
                 location: l.location,
                 campaign: Array.isArray(l.campaign_names) ? l.campaign_names.join(', ') : 'N/A',
                 campaignNames: Array.isArray(l.campaign_names) ? l.campaign_names : [],
@@ -996,19 +1014,29 @@ export default function CRMPage() {
                 <div className="flex items-center justify-between">
                     <div className="flex flex-col gap-1">
                         <h1 className="text-2xl font-bold tracking-tight text-white">CRM</h1>
-                        <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-xl w-fit border border-slate-700/50 mt-1">
-                            <button
-                                onClick={() => setActiveTab('all')}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'all' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
-                            >
-                                All Leads
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('replied')}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'replied' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'}`}
-                            >
-                                Replied
-                            </button>
+                        <div className="flex items-center gap-1 bg-slate-800/50 p-1 rounded-xl w-fit border border-slate-700/50 mt-1 flex-wrap">
+                            {([
+                                { key: 'all',        label: 'All Leads' },
+                                { key: 'replied',    label: 'Replied' },
+                                { key: 'call',       label: 'Calls' },
+                                { key: 'interested', label: 'Interested' },
+                                { key: 'mql',        label: 'MQL' },
+                                { key: 'sql',        label: 'SQL' },
+                                { key: 'partner',    label: 'Partner' },
+                                { key: 'client',     label: 'Client' },
+                            ] as const).map(({ key, label }) => (
+                                <button
+                                    key={key}
+                                    onClick={() => setActiveTab(key)}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        activeTab === key
+                                            ? 'bg-indigo-600 text-white shadow-lg'
+                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                                    }`}
+                                >
+                                    {label}
+                                </button>
+                            ))}
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1097,14 +1125,14 @@ export default function CRMPage() {
                                             {[
                                                 { value: '', label: 'All Statuses' },
                                                 { value: 'New', label: 'New' },
+                                                { value: 'Pending', label: 'Pending' },
                                                 { value: 'Connected', label: 'Connected' },
-                                                { value: 'Replied', label: 'Replied' },
-                                                { value: 'interested', label: 'Interested' },
-                                                { value: 'call', label: 'Call' },
-                                                { value: 'mql', label: 'MQL' },
-                                                { value: 'sql', label: 'SQL' },
-                                                { value: 'partner', label: 'Partner' },
-                                                { value: 'client', label: 'Client' }
+                                                { value: 'Engaged', label: 'Engaged' },
+                                                { value: 'Interested', label: 'Interested' },
+                                                { value: 'MQL', label: 'MQL' },
+                                                { value: 'SQL', label: 'SQL' },
+                                                { value: 'Partner', label: 'Partner' },
+                                                { value: 'Client', label: 'Client' }
                                             ].find(o => o.value === filterStatus)?.label || 'All Statuses'}
                                         </span>
                                         <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform duration-200 ${isStatusFilterOpen ? 'rotate-180' : ''}`} />
@@ -1115,14 +1143,14 @@ export default function CRMPage() {
                                             {[
                                                 { value: '', label: 'All Statuses' },
                                                 { value: 'New', label: 'New' },
+                                                { value: 'Pending', label: 'Pending' },
                                                 { value: 'Connected', label: 'Connected' },
-                                                { value: 'Replied', label: 'Replied' },
-                                                { value: 'interested', label: 'Interested' },
-                                                { value: 'call', label: 'Call' },
-                                                { value: 'mql', label: 'MQL' },
-                                                { value: 'sql', label: 'SQL' },
-                                                { value: 'partner', label: 'Partner' },
-                                                { value: 'client', label: 'Client' }
+                                                { value: 'Engaged', label: 'Engaged' },
+                                                { value: 'Interested', label: 'Interested' },
+                                                { value: 'MQL', label: 'MQL' },
+                                                { value: 'SQL', label: 'SQL' },
+                                                { value: 'Partner', label: 'Partner' },
+                                                { value: 'Client', label: 'Client' }
                                             ].map(option => (
                                                 <button
                                                     key={option.value}
