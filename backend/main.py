@@ -4,13 +4,13 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text, and_
+from sqlalchemy import text, and_, func
 from sqlalchemy.orm import Session, Mapped, mapped_column
 from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
 from models import Base, Campaign, Profile, Lead, Action
-from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history, get_recent_replies
+from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history, get_recent_replies, get_funnel_history
 from typing import Optional
 from datetime import datetime, time, timedelta, date
 from crm import get_leads_list, get_replied_leads, get_lead_activities
@@ -109,6 +109,18 @@ def sync_all(db: Session = Depends(get_db)):
     from services.meetalfred_client import sync_all_profiles_data
     result = sync_all_profiles_data(db)
     return {"status": "ok", "results": result}
+
+@app.get("/analytics/last-sync")
+def last_sync(db: Session = Depends(get_db)):
+    result = db.query(func.max(Action.last_synced_at)).scalar()
+    return {"last_synced_at": result.isoformat() if result else None}
+
+@app.get("/analytics/funnel-history")
+def funnel_history(
+    granularity: str = Query('day', description="day, week или month"),
+    db: Session = Depends(get_db)
+):
+    return get_funnel_history(db, granularity)
 
 @app.get("/analytics/total-actions")
 def total_actions(

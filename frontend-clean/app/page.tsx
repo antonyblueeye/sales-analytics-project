@@ -10,6 +10,7 @@ import {
   startOfYear, endOfYear, isSameDay
 } from 'date-fns';
 import axios from 'axios';
+import { saveInsightToHistory } from './components/Header';
 
 const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
   ssr: false,
@@ -19,6 +20,11 @@ const DashboardCharts = dynamic(() => import('./components/charts/DashboardChart
 const CampaignHistorySection = dynamic(() => import('./components/charts/CampaignHistorySection'), {
   ssr: false,
   loading: () => <div className="h-[400px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading historical analytics...</div>
+});
+
+const FunnelHistorySection = dynamic(() => import('./components/charts/FunnelHistorySection'), {
+  ssr: false,
+  loading: () => <div className="h-[400px] flex items-center justify-center bg-slate-800 text-slate-100 rounded-xl shadow w-full">Loading funnel dynamics...</div>
 });
 
 // Описание структуры данных профиля для TypeScript
@@ -205,6 +211,11 @@ export default function Dashboard() {
         params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
       });
       setAiInsight(res.data.insight);
+      saveInsightToHistory({
+        text: res.data.insight,
+        generatedAt: new Date().toISOString(),
+        dateRange: `${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d, yyyy')}`
+      });
     } catch (err) {
       console.error("AI Insight error", err);
       setAiInsight("Unable to load insights at this time.");
@@ -644,6 +655,7 @@ export default function Dashboard() {
       </div>
 
       <DashboardCharts dailyData={dailyData} barData={barData} campaignData={campaignData} recentReplies={recentReplies} />
+      <FunnelHistorySection />
       <CampaignHistorySection />
     </div>
   );

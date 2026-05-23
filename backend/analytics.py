@@ -615,6 +615,36 @@ def get_replied_titles_analytics(db: Session, campaign_name: str = "all"):
         for k, v in sorted_titles
     ]
 
+def get_funnel_history(db: Session, granularity: str = 'day'):
+    if granularity not in ['day', 'week', 'month']:
+        granularity = 'day'
+    sql = text(f"""
+        SELECT
+            date_trunc('{granularity}', a.performed_at) AS period,
+            COUNT(*) FILTER (WHERE a.action_type = 'interested') AS interested,
+            COUNT(*) FILTER (WHERE a.action_type = 'call') AS calls,
+            COUNT(*) FILTER (WHERE a.action_type = 'mql') AS mql,
+            COUNT(*) FILTER (WHERE a.action_type = 'sql') AS sql,
+            COUNT(*) FILTER (WHERE a.action_type = 'partner') AS partner,
+            COUNT(*) FILTER (WHERE a.action_type = 'client') AS clients
+        FROM actions a
+        GROUP BY period
+        ORDER BY period
+    """)
+    result = db.execute(sql)
+    return [
+        {
+            "period": row.period.isoformat(),
+            "interested": row.interested,
+            "calls": row.calls,
+            "mql": row.mql,
+            "sql": row.sql,
+            "partner": row.partner,
+            "clients": row.clients
+        }
+        for row in result
+    ]
+
 def get_locations_analytics(db: Session, campaign_name: str = "all"):
     import re
     from collections import defaultdict
