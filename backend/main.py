@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text, and_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, Mapped, mapped_column
 from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
 from scheduler import start_scheduler
@@ -50,7 +50,11 @@ def sync_campaigns_endpoint(
     """
     Запускает синхронизацию кампаний из MeetAlfred.
     """
-    result = sync_campaigns(db, api_key, campaign_type)
+    from models import Profile
+    profile = db.query(Profile).filter(Profile.api_key == api_key).first()
+    if not profile:
+        return {"error": "Профиль с таким API-ключом не найден"}
+    result = sync_campaigns(db, profile.id, api_key, campaign_type)  # type: ignore[arg-type]
     return {"status": "ok", "result": result}
 
 @app.post("/sync-leads")
@@ -64,7 +68,7 @@ def sync_leads_endpoint(
     profile = db.query(Profile).filter(Profile.api_key == api_key).first()
     if not profile:
         return {"error": "Профиль с таким API-ключом не найден"}
-    result = sync_leads(db, profile.id, api_key)
+    result = sync_leads(db, profile.id, api_key)  # type: ignore[arg-type]
     return {"status": "ok", "result": result}
 
 @app.post("/sync-actions")
@@ -77,7 +81,7 @@ def sync_actions_endpoint(
     profile = db.query(Profile).filter(Profile.api_key == api_key).first()
     if not profile:
         return {"error": "Профиль с таким API-ключом не найден"}
-    result = sync_actions(db, profile.id, api_key)
+    result = sync_actions(db, profile.id, api_key)  # type: ignore[arg-type]
     return {"status": "ok", "result": result}
 
 @app.get("/actions")
@@ -230,6 +234,18 @@ class ActivityCreate(BaseModel):
     campaign_name: str
     profile_name: str
 
+
+class LeadCreate(BaseModel):
+    first_name: str
+    last_name: str
+    email: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    company: Optional[str] = None
+    title: Optional[str] = None
+    location: Optional[str] = None
+    campaign_name: Optional[str] = None
+    profile_name: Optional[str] = None
+
 @app.post("/crm/leads/{lead_id}/activities")
 def create_lead_activity(
     lead_id: int,
@@ -246,6 +262,14 @@ def delete_activity(
 ):
     from crm import remove_activity
     return remove_activity(db, activity_id)
+
+@app.post("/crm/leads")
+def create_lead(
+    lead: LeadCreate,
+    db: Session = Depends(get_db)
+):
+    from crm import add_lead_manual
+    return add_lead_manual(db, lead)
 
 @app.get("/analytics/campaigns-list")
 def campaigns_list(db: Session = Depends(get_db)):

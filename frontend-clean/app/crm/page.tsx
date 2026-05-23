@@ -536,6 +536,25 @@ export default function CRMPage() {
     const [activeTab, setActiveTab] = useState<'all' | 'replied'>('all');
     const [toast, setToast] = useState<{ message: string; type: 'success' | 'alert' } | null>(null);
 
+    // Add Lead modal
+    const [showAddLeadModal, setShowAddLeadModal] = useState(false);
+    const [isCreatingLead, setIsCreatingLead] = useState(false);
+    const [newLead, setNewLead] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        linkedin_url: '',
+        company: '',
+        title: '',
+        location: '',
+        campaign_name: '',
+        profile_name: '',
+    });
+    const [isAddCampaignOpen, setIsAddCampaignOpen] = useState(false);
+    const [isAddProfileOpen, setIsAddProfileOpen] = useState(false);
+    const addCampaignRef = useRef<HTMLDivElement>(null);
+    const addProfileRef = useRef<HTMLDivElement>(null);
+
 
     // Filter states
     const [filterCampaign, setFilterCampaign] = useState('');
@@ -791,6 +810,54 @@ export default function CRMPage() {
         }
     };
 
+    const handleCreateLead = async () => {
+        if (!newLead.first_name.trim() || !newLead.last_name.trim()) {
+            showToast('First name and Last name are required', 'alert');
+            return;
+        }
+        // Если выбрано одно из двух (campaign/profile), требуем оба, чтобы корректно связать
+        if ((newLead.campaign_name && !newLead.profile_name) || (!newLead.campaign_name && newLead.profile_name)) {
+            showToast('Select both Campaign and Profile, or leave both empty', 'alert');
+            return;
+        }
+
+        setIsCreatingLead(true);
+        try {
+            const payload = {
+                first_name: newLead.first_name.trim(),
+                last_name: newLead.last_name.trim(),
+                email: newLead.email.trim() || null,
+                linkedin_url: newLead.linkedin_url.trim() || null,
+                company: newLead.company.trim() || null,
+                title: newLead.title.trim() || null,
+                location: newLead.location.trim() || null,
+                campaign_name: newLead.campaign_name || null,
+                profile_name: newLead.profile_name || null,
+            };
+            await axios.post('http://localhost:8000/crm/leads', payload);
+            showToast(`Lead "${payload.first_name} ${payload.last_name}" added`);
+            setShowAddLeadModal(false);
+            setNewLead({
+                first_name: '', last_name: '', email: '', linkedin_url: '',
+                company: '', title: '', location: '',
+                campaign_name: '', profile_name: '',
+            });
+            // Перезагрузим список с текущими фильтрами
+            fetchLeads(1, {
+                search, firstName: filterFirstName, lastName: filterLastName,
+                company: filterCompany, location: filterLocation, position: filterPosition,
+                createDateRange: filterCreateDate, activityDateRange: filterActivityDate,
+                campaign: filterCampaign, status: filterStatus,
+            });
+            setCurrentPage(1);
+        } catch (err: any) {
+            const detail = err?.response?.data?.detail || 'Failed to create lead';
+            showToast(detail, 'alert');
+        } finally {
+            setIsCreatingLead(false);
+        }
+    };
+
     const handleDeleteActivity = async (activityId: number) => {
         if (!activeLead) return;
         
@@ -945,6 +1012,13 @@ export default function CRMPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowAddLeadModal(true)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white shadow-lg shadow-indigo-900/40 transition-all"
+                        >
+                            <UserPlus size={18} />
+                            Add Lead
+                        </button>
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
@@ -1735,6 +1809,182 @@ export default function CRMPage() {
                         </div>
                     </div>
                 </>
+            )}
+
+            {/* Add Lead Modal */}
+            {showAddLeadModal && (
+                <div
+                    className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200"
+                    onClick={() => !isCreatingLead && setShowAddLeadModal(false)}
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative bg-slate-900/95 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto custom-scrollbar"
+                    >
+                        {/* Header */}
+                        <div className="sticky top-0 bg-slate-900/95 backdrop-blur-xl border-b border-slate-700/70 px-6 py-4 flex items-center justify-between z-10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-md">
+                                    <UserPlus size={20} className="text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-white">Add New Lead</h2>
+                                    <p className="text-xs text-slate-400">Manually create a lead in the database</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowAddLeadModal(false)}
+                                disabled={isCreatingLead}
+                                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition disabled:opacity-50"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-5">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-medium text-slate-300">First Name <span className="text-rose-400">*</span></label>
+                                    <input
+                                        type="text"
+                                        value={newLead.first_name}
+                                        onChange={(e) => setNewLead({ ...newLead, first_name: e.target.value })}
+                                        placeholder="John"
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-medium text-slate-300">Last Name <span className="text-rose-400">*</span></label>
+                                    <input
+                                        type="text"
+                                        value={newLead.last_name}
+                                        onChange={(e) => setNewLead({ ...newLead, last_name: e.target.value })}
+                                        placeholder="Doe"
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-medium text-slate-300">Email</label>
+                                    <input
+                                        type="email"
+                                        value={newLead.email}
+                                        onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                                        placeholder="john@company.com"
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-medium text-slate-300">LinkedIn URL</label>
+                                    <input
+                                        type="url"
+                                        value={newLead.linkedin_url}
+                                        onChange={(e) => setNewLead({ ...newLead, linkedin_url: e.target.value })}
+                                        placeholder="https://linkedin.com/in/..."
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-medium text-slate-300">Company</label>
+                                    <input
+                                        type="text"
+                                        value={newLead.company}
+                                        onChange={(e) => setNewLead({ ...newLead, company: e.target.value })}
+                                        placeholder="Acme Inc."
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5">
+                                    <label className="text-xs font-medium text-slate-300">Title</label>
+                                    <input
+                                        type="text"
+                                        value={newLead.title}
+                                        onChange={(e) => setNewLead({ ...newLead, title: e.target.value })}
+                                        placeholder="CEO"
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-1.5 md:col-span-2">
+                                    <label className="text-xs font-medium text-slate-300">Location</label>
+                                    <input
+                                        type="text"
+                                        value={newLead.location}
+                                        onChange={(e) => setNewLead({ ...newLead, location: e.target.value })}
+                                        placeholder="San Francisco, CA"
+                                        className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Campaign + Profile (optional pair) */}
+                            <div className="rounded-xl border border-slate-700/70 bg-slate-800/30 p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                    <h3 className="text-sm font-semibold text-slate-200">Link to Campaign & Profile</h3>
+                                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Optional</span>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-medium text-slate-300">Campaign</label>
+                                        <select
+                                            value={newLead.campaign_name}
+                                            onChange={(e) => setNewLead({ ...newLead, campaign_name: e.target.value })}
+                                            className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                            <option value="">— None —</option>
+                                            {allCampaigns.map(c => (
+                                                <option key={c} value={c}>{c}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div className="flex flex-col gap-1.5">
+                                        <label className="text-xs font-medium text-slate-300">Profile</label>
+                                        <select
+                                            value={newLead.profile_name}
+                                            onChange={(e) => setNewLead({ ...newLead, profile_name: e.target.value })}
+                                            className="bg-slate-800/70 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                            <option value="">— None —</option>
+                                            {allProfiles.map(p => (
+                                                <option key={p} value={p}>{p}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-2">
+                                    If you select both, the lead will be attached to that campaign as a manual <span className="text-indigo-300">invited</span> action.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="sticky bottom-0 bg-slate-900/95 backdrop-blur-xl border-t border-slate-700/70 px-6 py-4 flex items-center justify-end gap-2">
+                            <button
+                                onClick={() => setShowAddLeadModal(false)}
+                                disabled={isCreatingLead}
+                                className="px-4 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition disabled:opacity-50"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleCreateLead}
+                                disabled={isCreatingLead}
+                                className="inline-flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-lg bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white shadow-lg shadow-indigo-900/40 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                {isCreatingLead ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        Saving...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Check size={16} />
+                                        Create Lead
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* Premium Notification Toast */}

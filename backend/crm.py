@@ -8,6 +8,7 @@ from models import Action, Lead
 from sqlalchemy import and_
 from datetime import datetime, date
 import uuid
+from typing import Optional, Any, Dict
 from fastapi import HTTPException
 from models import Campaign, Profile, Action
 
@@ -15,23 +16,23 @@ def get_leads_list(
     db: Session, 
     page: int = 1, 
     limit: int = 20, 
-    search: str = None,
-    first_name: str = None,
-    last_name: str = None,
-    company: str = None,
-    location: str = None,
-    title: str = None,
-    create_date_from: str = None,
-    create_date_to: str = None,
-    activity_date_from: str = None,
-    activity_date_to: str = None,
-    campaign: str = None,
-    status: str = None
+    search: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    company: Optional[str] = None,
+    location: Optional[str] = None,
+    title: Optional[str] = None,
+    create_date_from: Optional[str] = None,
+    create_date_to: Optional[str] = None,
+    activity_date_from: Optional[str] = None,
+    activity_date_to: Optional[str] = None,
+    campaign: Optional[str] = None,
+    status: Optional[str] = None
 ):
     offset = (page - 1) * limit
     
-    where_clauses = []
-    params = {"offset": offset, "limit": limit}
+    where_clauses: list[str] = []
+    params: Dict[str, Any] = {"offset": offset, "limit": limit}
     
     if search:
         where_clauses.append("(l.first_name ILIKE :search OR l.last_name ILIKE :search OR (l.first_name || ' ' || l.last_name) ILIKE :search OR l.current_employer ILIKE :search)")
@@ -181,23 +182,23 @@ def get_replied_leads(
     db: Session, 
     page: int = 1, 
     limit: int = 20,
-    search: str = None,
-    first_name: str = None,
-    last_name: str = None,
-    company: str = None,
-    location: str = None,
-    title: str = None,
-    create_date_from: str = None,
-    create_date_to: str = None,
-    activity_date_from: str = None,
-    activity_date_to: str = None,
-    campaign: str = None,
-    status: str = None
+    search: Optional[str] = None,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    company: Optional[str] = None,
+    location: Optional[str] = None,
+    title: Optional[str] = None,
+    create_date_from: Optional[str] = None,
+    create_date_to: Optional[str] = None,
+    activity_date_from: Optional[str] = None,
+    activity_date_to: Optional[str] = None,
+    campaign: Optional[str] = None,
+    status: Optional[str] = None
 ):
     offset = (page - 1) * limit
     
-    where_clauses = ["a.action_type = 'replied'"]
-    params = {"offset": offset, "limit": limit}
+    where_clauses: list[str] = ["a.action_type = 'replied'"]
+    params: Dict[str, Any] = {"offset": offset, "limit": limit}
     
     # ... previous filters ...
     if search:
@@ -452,6 +453,103 @@ def add_lead_activity(db: Session, lead_id: int, activity_data):
     # -----------------------------------------------------------
     
     return {"status": "success", "id": new_action.id}
+
+def add_lead_manual(db: Session, lead_data):
+    """
+    Создаёт лида вручную из CRM. Опционально привязывает его к кампании/профилю
+    через служебное действие 'invited' с external_id вида manual_lead_<uuid>,
+    чтобы лид появлялся в выборках по кампании/профилю.
+    Дополнительно логирует событие в manual_leads.log.
+    """
+    # 1. Проверка на дубликат по LinkedIn / email
+    existing = None
+    if lead_data.linkedin_url:
+        existing = db.query(Lead).filter(Lead.linkedin_url == lead_data.linkedin_url).first()
+    if not existing and lead_data.email:
+        existing = db.query(Lead).filter(
+            (Lead.email == lead_data.email) | (Lead.work_email == lead_data.email)
+        ).first()
+
+    if existing:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Lead already exists (id={existing.id}, name={existing.first_name} {existing.last_name})"
+        )
+
+    # 2. Создаём лида
+    new_lead = Lead(
+        external_id=f"manual_lead_{uuid.uuid4().hex}",
+        first_name=lead_data.first_name or "",
+        last_name=lead_data.last_name or "",
+        email=lead_data.email or None,
+        work_email=lead_data.email or None,
+        linkedin_url=lead_data.linkedin_url or None,
+        current_employer=lead_data.company or None,
+        current_title=lead_data.title or None,
+        location=lead_data.location or None,
+    )
+    db.add(new_lead)
+    db.commit()
+    db.refresh(new_lead)
+
+    # 3. Если указаны кампания и профиль, создаём служебное действие 'invited',
+    # чтобы лид связался с ними и был виден в фильтрах
+    linked_campaign = None
+    linked_profile = None
+    if lead_data.campaign_name and lead_data.profile_name:
+        campaign = db.query(Campaign).filter(Campaign.name == lead_data.campaign_name).first()
+        if not campaign:
+            res = db.execute(text("""
+                SELECT id FROM campaigns
+                WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :name
+                LIMIT 1
+            """), {"name": lead_data.campaign_name})
+            row = res.first()
+            if row:
+                campaign = db.query(Campaign).get(row[0])
+        if not campaign:
+            campaign = db.query(Campaign).filter(Campaign.name.ilike(f"%{lead_data.campaign_name}%")).first()
+
+        profile = db.query(Profile).filter(Profile.name == lead_data.profile_name).first()
+
+        if campaign and profile:
+            new_action = Action(
+                external_id=f"manual_lead_invite_{uuid.uuid4().hex}",
+                action_type="invited",
+                message="",
+                performed_at=datetime.now(),
+                lead_id=new_lead.id,
+                campaign_id=campaign.id,
+                profile_id=profile.id,
+            )
+            db.add(new_action)
+            db.commit()
+            linked_campaign = campaign.name
+            linked_profile = profile.name
+
+    # 4. Лог в файл (резервная копия)
+    log_file = "manual_leads.log"
+    full_name = f"{new_lead.first_name} {new_lead.last_name}".strip() or "Unknown"
+    log_entry = (
+        f"[{datetime.now().isoformat()}] LEAD_ID: {new_lead.id} | NAME: {full_name} | "
+        f"EMAIL: {lead_data.email or ''} | LINKEDIN: {lead_data.linkedin_url or ''} | "
+        f"COMPANY: {lead_data.company or ''} | TITLE: {lead_data.title or ''} | "
+        f"LOCATION: {lead_data.location or ''} | "
+        f"CAMPAIGN: {linked_campaign or ''} | PROFILE: {linked_profile or ''}\n"
+    )
+    try:
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(log_entry)
+    except Exception as e:
+        print(f"[manual_leads.log] write error: {e}")
+
+    return {
+        "status": "success",
+        "id": new_lead.id,
+        "linked_campaign": linked_campaign,
+        "linked_profile": linked_profile,
+    }
+
 
 def remove_activity(db: Session, activity_id: int):
     action = db.query(Action).filter(Action.id == activity_id).first()

@@ -290,29 +290,29 @@ const CampaignCarouselChart = ({ data }: { data: any[] }) => {
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Messages / Replies</div>
               <div className="text-lg font-bold">{currentCamp.messages || 0} <span className="text-xs text-slate-500 font-normal">/</span> <span className="text-indigo-400">{currentCamp.replies || 0}</span></div>
             </div>
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 opacity-60">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30">
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Interested</div>
-              <div className="text-lg font-bold text-slate-300">0</div>
+              <div className="text-lg font-bold text-slate-300">{currentCamp.interested || 0}</div>
             </div>
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 opacity-60">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30">
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Calls</div>
-              <div className="text-lg font-bold text-slate-300">0</div>
+              <div className="text-lg font-bold text-slate-300">{currentCamp.calls || 0}</div>
             </div>
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 opacity-60">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30">
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">MQL</div>
-              <div className="text-lg font-bold text-amber-400/80">0</div>
+              <div className="text-lg font-bold text-amber-400">{currentCamp.mql || 0}</div>
             </div>
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 opacity-60">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30">
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">SQL</div>
-              <div className="text-lg font-bold text-orange-400/80">0</div>
+              <div className="text-lg font-bold text-orange-400">{currentCamp.sql || 0}</div>
             </div>
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 opacity-60">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30">
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Partner</div>
-              <div className="text-lg font-bold text-rose-400/80">0</div>
+              <div className="text-lg font-bold text-rose-400">{currentCamp.partner || 0}</div>
             </div>
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 opacity-60">
+            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30">
               <div className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Clients</div>
-              <div className="text-lg font-bold text-emerald-400">0</div>
+              <div className="text-lg font-bold text-emerald-400">{currentCamp.clients || 0}</div>
             </div>
           </div>
         </div>

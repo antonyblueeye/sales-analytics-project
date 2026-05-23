@@ -1,6 +1,6 @@
 import httpx # type: ignore
 import hashlib
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dateutil import parser
 from models import Lead, Campaign, Action
 from sqlalchemy.orm import Session # type: ignore
@@ -15,7 +15,7 @@ def make_action_external_id(lead_urn, campaign_key, created_at, desc, msg):
     # Создаём MD5-хеш (32 символа)
     return hashlib.md5(raw.encode('utf-8')).hexdigest()
 
-def make_linkedin_url(handle: str) -> str:
+def make_linkedin_url(handle: str) -> Optional[str]:
     """Превращает linkedin_handle в красивую ссылку на профиль"""
     if handle:
         return f"https://www.linkedin.com/in/{handle}/"
@@ -326,9 +326,9 @@ def sync_all_profiles_data(db: Session) -> dict:
     for profile in profiles:
         print(f"[Sync] Синхронизация для профиля {profile.name}")
         try:
-            campaigns_result = sync_campaigns(db, profile.id, profile.api_key, campaign_type="all")
-            leads_result = sync_leads(db, profile.id, profile.api_key)
-            actions_result = sync_actions(db, profile.id, profile.api_key)
+            campaigns_result = sync_campaigns(db, profile.id, profile.api_key, campaign_type="all")  # type: ignore[arg-type]
+            leads_result = sync_leads(db, profile.id, profile.api_key)  # type: ignore[arg-type]
+            actions_result = sync_actions(db, profile.id, profile.api_key)  # type: ignore[arg-type]
             results[profile.name] = {
                 "campaigns": campaigns_result,
                 "leads": leads_result,
