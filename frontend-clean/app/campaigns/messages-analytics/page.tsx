@@ -1,12 +1,13 @@
 'use client';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mail, MessageSquare, BarChart3, PieChart } from 'lucide-react';
+import { MessageSquare, PieChart, TrendingUp } from 'lucide-react';
 import ResponseAnalytics from '../ResponseAnalytics';
 import CampaignAnalytics from '../CampaignAnalytics';
+import TemplateConversions from '../TemplateConversions';
 
 export default function MessagesAnalyticsPage() {
-    const [activeTab, setActiveTab] = useState<'responses' | 'messages'>('responses');
+    const [activeTab, setActiveTab] = useState<'responses' | 'messages' | 'conversions'>('responses');
 
     const tabs = [
         { 
@@ -20,6 +21,12 @@ export default function MessagesAnalyticsPage() {
             label: 'Analysis of Messages', 
             icon: MessageSquare,
             description: 'Performance metrics for campaign message templates'
+        },
+        {
+            id: 'conversions',
+            label: 'Template Conversions',
+            icon: TrendingUp,
+            description: 'Which templates lead to Interested, MQL, SQL, Partner, Client'
         }
     ];
 
@@ -63,8 +70,10 @@ export default function MessagesAnalyticsPage() {
                     >
                         {activeTab === 'responses' ? (
                             <ResponseAnalytics />
-                        ) : (
+                        ) : activeTab === 'messages' ? (
                             <CampaignAnalytics />
+                        ) : (
+                            <TemplateConversions />
                         )}
                     </motion.div>
                 </AnimatePresence>

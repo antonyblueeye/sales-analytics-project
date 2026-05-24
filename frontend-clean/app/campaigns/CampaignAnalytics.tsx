@@ -9,7 +9,6 @@ import {
     BarChart3,
     Trophy,
     ExternalLink,
-    Clock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
@@ -75,7 +74,6 @@ const TemplateCard = ({
                             ) : (
                                 <span className="text-[8px] font-bold text-slate-500 uppercase tracking-tighter">Follow-up</span>
                             )}
-                            <span className="text-[8px] text-slate-600 font-medium">{template.date}</span>
                         </div>
                         <h3 className={`text-xs font-bold transition-colors line-clamp-1 ${
                             isSelected ? 'text-white' : 'text-slate-200 group-hover:text-white'
@@ -147,10 +145,6 @@ const MessagePreview = ({ template }: { template: Template | null }) => {
                     <span className="px-1.5 py-0.5 rounded text-[8px] font-bold bg-indigo-500/10 text-indigo-400 uppercase tracking-widest border border-indigo-500/20">
                         {template.is_invite ? 'Invitation' : 'Sequential'}
                     </span>
-                    <div className="flex items-center gap-1 text-slate-600">
-                        <Clock size={10} />
-                        <span className="text-[9px] font-bold uppercase">{template.date}</span>
-                    </div>
                 </div>
                 <h2 className="text-sm font-extrabold text-white truncate">{template.title}</h2>
                 <div className="flex flex-wrap gap-1.5 mt-1">

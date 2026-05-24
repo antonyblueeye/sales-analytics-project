@@ -356,6 +356,14 @@ def replied_leads_titles_analytics(
     from analytics import get_replied_titles_analytics
     return get_replied_titles_analytics(db, campaign)
 
+@app.get("/analytics/template-conversions")
+def template_conversions(
+    campaign: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    from analytics import get_template_conversion_analytics
+    return get_template_conversion_analytics(db, campaign)
+
 @app.get("/analytics/locations")
 def locations_analytics(
     campaign: str = "all",

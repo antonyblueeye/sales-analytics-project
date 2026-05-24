@@ -5,7 +5,7 @@ import {
     LayoutDashboard,
     Users,
     Mail,
-    Settings,
+    BookOpen,
     TrendingUp,
     Calendar,
     Target,
@@ -19,7 +19,7 @@ const navItems = [
     { name: 'Leads Analytics', href: '/leads', icon: Users },
     { name: 'Messages Analytics', href: '/campaigns/messages-analytics', icon: Mail },
     { name: 'CRM', href: '/crm', icon: Calendar },
-    { name: 'Settings', href: '/settings', icon: Settings },
+    { name: 'Guide', href: '/settings', icon: BookOpen },
 ];
 
 type SidebarProps = {

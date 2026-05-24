@@ -767,3 +767,106 @@ def get_locations_analytics(db: Session, campaign_name: str = "all"):
             aggregated[found_country] += row.amount
             
     return [{"location": k, "count": v} for k, v in aggregated.items()]
+
+
+def get_template_conversion_analytics(db: Session, campaign_name: Optional[str] = None):
+    """
+    For each message template, count how many leads (who received it) subsequently
+    got a high-value status action: interested, call, mql, sql, partner, client.
+    Logic: action sent via template → then lead has a downstream action of that type
+    (performed_at > the sent action's performed_at, same lead_id).
+    """
+    campaign_filter = ""
+    params: dict = {}
+    if campaign_name and campaign_name != "ALL_CAMPAIGNS":
+        campaign_filter = """
+            AND mt.campaign_id IN (
+                SELECT id FROM campaigns
+                WHERE trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) = :campaign_name
+                   OR name = :campaign_name
+            )
+        """
+        params["campaign_name"] = campaign_name
+
+    sql = text(f"""
+        WITH sent_actions AS (
+            -- Each action that was sent via a template
+            SELECT
+                mtm.message_template_id,
+                mt.template,
+                mt.step_index,
+                a.lead_id,
+                a.performed_at AS sent_at,
+                mt.campaign_id,
+                c.name AS campaign_name
+            FROM message_templates_map mtm
+            JOIN message_templates mt ON mtm.message_template_id = mt.id
+            JOIN actions a ON mtm.action_id = a.id
+            JOIN campaigns c ON mt.campaign_id = c.id
+            WHERE 1=1 {campaign_filter}
+        ),
+        conversions AS (
+            -- For each sent action, check if the lead later got a conversion event
+            SELECT
+                sa.message_template_id,
+                sa.lead_id,
+                sa.sent_at,
+                sa.template,
+                sa.step_index,
+                sa.campaign_name,
+                MAX(CASE WHEN da.action_type = 'interested' AND da.performed_at > sa.sent_at THEN 1 ELSE 0 END) as got_interested,
+                MAX(CASE WHEN da.action_type = 'call'       AND da.performed_at > sa.sent_at THEN 1 ELSE 0 END) as got_call,
+                MAX(CASE WHEN da.action_type = 'mql'        AND da.performed_at > sa.sent_at THEN 1 ELSE 0 END) as got_mql,
+                MAX(CASE WHEN da.action_type = 'sql'        AND da.performed_at > sa.sent_at THEN 1 ELSE 0 END) as got_sql,
+                MAX(CASE WHEN da.action_type = 'partner'    AND da.performed_at > sa.sent_at THEN 1 ELSE 0 END) as got_partner,
+                MAX(CASE WHEN da.action_type = 'client'     AND da.performed_at > sa.sent_at THEN 1 ELSE 0 END) as got_client
+            FROM sent_actions sa
+            LEFT JOIN actions da ON da.lead_id = sa.lead_id
+            GROUP BY sa.message_template_id, sa.lead_id, sa.sent_at, sa.template, sa.step_index, sa.campaign_name
+        ),
+        aggregated AS (
+            SELECT
+                message_template_id,
+                template,
+                step_index,
+                COUNT(DISTINCT lead_id) AS sent_count,
+                SUM(got_interested) AS interested_count,
+                SUM(got_call)       AS call_count,
+                SUM(got_mql)        AS mql_count,
+                SUM(got_sql)        AS sql_count,
+                SUM(got_partner)    AS partner_count,
+                SUM(got_client)     AS client_count,
+                (SUM(got_interested) + SUM(got_call) + SUM(got_mql) +
+                 SUM(got_sql) + SUM(got_partner) + SUM(got_client)) AS total_conversions,
+                array_agg(DISTINCT trim(regexp_replace(campaign_name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g'))) AS campaigns
+            FROM conversions
+            GROUP BY message_template_id, template, step_index
+            HAVING COUNT(DISTINCT lead_id) >= 5
+        )
+        SELECT *,
+            ROUND(total_conversions::numeric / NULLIF(sent_count, 0) * 100, 1) AS conversion_rate
+        FROM aggregated
+        ORDER BY total_conversions DESC, sent_count DESC
+        LIMIT 50
+    """)
+
+    rows = db.execute(sql, params)
+    results = []
+    for row in rows:
+        r = row._mapping
+        results.append({
+            "id": r["message_template_id"],
+            "text": r["template"],
+            "is_invite": r["step_index"] == 0,
+            "sent_count": int(r["sent_count"]),
+            "total_conversions": int(r["total_conversions"]),
+            "conversion_rate": float(r["conversion_rate"] or 0),
+            "interested_count": int(r["interested_count"]),
+            "call_count": int(r["call_count"]),
+            "mql_count": int(r["mql_count"]),
+            "sql_count": int(r["sql_count"]),
+            "partner_count": int(r["partner_count"]),
+            "client_count": int(r["client_count"]),
+            "campaigns": list(r["campaigns"]) if r["campaigns"] else [],
+        })
+    return results
