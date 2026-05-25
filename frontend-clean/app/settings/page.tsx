@@ -1,9 +1,6 @@
 'use client';
 import {
-    LayoutDashboard, Users, Mail, GitBranch, RefreshCw,
-    Database, Zap, MessageSquare, BarChart3, BookOpen,
-    ArrowRight, CheckCircle2, Circle, Star, Phone, TrendingUp,
-    UserCheck, Send, Calendar
+    LayoutDashboard, Users, Mail, GitBranch, BookOpen, Calendar
 } from 'lucide-react';
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -54,7 +51,7 @@ export default function GuidePage() {
                 </div>
                 <p className="text-slate-400 text-sm max-w-2xl">
                     Welcome! This is a LinkedIn outreach analytics platform built on top of <strong className="text-slate-200">MeetAlfred</strong>.
-                    It tracks your campaigns, leads, and messages — and shows you what's working and what's not.
+                    It tracks your campaigns, leads, and messages — and shows you what&apos;s working and what&apos;s not.
                 </p>
             </div>
 
@@ -99,7 +96,7 @@ export default function GuidePage() {
             {/* Lead statuses */}
             <Section title="Lead Status Logic">
                 <p className="text-sm text-slate-400">
-                    A lead's status is <strong className="text-slate-200">derived automatically</strong> from their activity history — it always reflects the most advanced stage reached:
+                    A lead&apos;s status is <strong className="text-slate-200">derived automatically</strong> from their activity history — it always reflects the most advanced stage reached:
                 </p>
                 <div className="flex flex-wrap gap-2 items-center">
                     {[
