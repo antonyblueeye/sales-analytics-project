@@ -208,7 +208,7 @@ export default function Dashboard() {
     setIsInsightLoading(true);
     setAiInsight('');
     try {
-      const res = await axios.get('http://localhost:8000/analytics/ai-insights', {
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/ai-insights`, {
         params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
       });
       let insightText: string = res.data.insight;
@@ -245,22 +245,22 @@ export default function Dashboard() {
 
       // Запускаем все запросы параллельно: профили и кампании (текущие и прошлые)
       const [currRes, prevRes, currCampRes, prevCampRes, dailyRes, recentRepliesRes] = await Promise.all([
-        axios.get('http://localhost:8000/analytics/profiles-summary', {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/profiles-summary`, {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         }),
-        axios.get('http://localhost:8000/analytics/profiles-summary', {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/profiles-summary`, {
           params: { from_date: format(prevStart, 'yyyy-MM-dd'), to_date: format(prevEnd, 'yyyy-MM-dd') }
         }),
-        axios.get('http://localhost:8000/analytics/campaigns-summary', {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-summary`, {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         }),
-        axios.get('http://localhost:8000/analytics/campaigns-summary', {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-summary`, {
           params: { from_date: format(prevStart, 'yyyy-MM-dd'), to_date: format(prevEnd, 'yyyy-MM-dd') }
         }),
-        axios.get('http://localhost:8000/analytics/daily-summary', {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/daily-summary`, {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         }),
-        axios.get('http://localhost:8000/analytics/recent-replies', {
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/recent-replies`, {
           params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
         })
       ]);

@@ -63,8 +63,8 @@ export default function LeadPage() {
     useEffect(() => {
         if (!leadId) return;
         Promise.all([
-            axios.get(`http://localhost:8000/crm/leads/${leadId}`),
-            axios.get(`http://localhost:8000/crm/leads/${leadId}/activities`),
+            axios.get(`${process.env.NEXT_PUBLIC_API_URL}/crm/leads/${leadId}`),
+            axios.get(`${process.env.NEXT_PUBLIC_API_URL}/crm/leads/${leadId}/activities`),
         ]).then(([leadRes, actRes]) => {
             setLead(leadRes.data);
             setActivities(actRes.data.activities || []);

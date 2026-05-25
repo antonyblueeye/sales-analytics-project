@@ -37,7 +37,7 @@ export default function ResponseAnalytics() {
     useEffect(() => {
         const fetchProfiles = async () => {
             try {
-                const response = await axios.get('http://localhost:8000/profiles');
+                const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/profiles`);
                 setProfiles(response.data);
             } catch (err) {
                 console.error('Error fetching profiles:', err);
@@ -50,7 +50,7 @@ export default function ResponseAnalytics() {
         const fetchStats = async () => {
             setLoading(true);
             try {
-                let url = `http://localhost:8000/analytics/custom-messages?mode=${mode}`;
+                let url = `${process.env.NEXT_PUBLIC_API_URL}/analytics/custom-messages?mode=${mode}`;
                 if (selectedProfiles.length > 0) {
                     selectedProfiles.forEach(p => {
                         url += `&profiles=${encodeURIComponent(p)}`;

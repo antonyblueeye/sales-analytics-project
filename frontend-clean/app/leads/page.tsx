@@ -19,7 +19,7 @@ export default function LeadsAnalytics() {
 
     useEffect(() => {
         // Fetch campaigns
-        fetch('http://localhost:8000/analytics/campaigns-list')
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-list`)
             .then(res => res.json())
             .then(data => {
                 setCampaigns(data);
@@ -31,9 +31,9 @@ export default function LeadsAnalytics() {
         // Fetch title and location data
         setLoadingTitles(true);
         Promise.all([
-            fetch(`http://localhost:8000/analytics/leads?campaign=${encodeURIComponent(selectedCampaign)}`).then(res => res.json()),
-            fetch(`http://localhost:8000/analytics/replied-leads-titles?campaign=${encodeURIComponent(selectedCampaign)}`).then(res => res.json()),
-            fetch(`http://localhost:8000/analytics/locations?campaign=${encodeURIComponent(selectedCampaign)}`).then(res => res.json())
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/analytics/leads?campaign=${encodeURIComponent(selectedCampaign)}`).then(res => res.json()),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/analytics/replied-leads-titles?campaign=${encodeURIComponent(selectedCampaign)}`).then(res => res.json()),
+            fetch(`${process.env.NEXT_PUBLIC_API_URL}/analytics/locations?campaign=${encodeURIComponent(selectedCampaign)}`).then(res => res.json())
         ])
             .then(([leadsData, repliedData, locData]) => {
                 setTitleData(leadsData);

@@ -197,7 +197,7 @@ export default function CampaignAnalytics() {
     React.useEffect(() => {
         const fetchCampaigns = async () => {
             try {
-                const response = await axios.get('http://localhost:8000/analytics/campaigns-list');
+                const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-list`);
                 setCampaigns(response.data);
                 if (response.data.length > 0) {
                     setSelectedCampaign(response.data[0]);
@@ -219,8 +219,8 @@ export default function CampaignAnalytics() {
             setDataLoading(true);
             try {
                 const url = isGlobal 
-                    ? 'http://localhost:8000/analytics/campaign-sequence?campaign_name=ALL_CAMPAIGNS'
-                    : `http://localhost:8000/analytics/campaign-sequence?campaign_name=${encodeURIComponent(selectedCampaign)}`;
+                    ? `${process.env.NEXT_PUBLIC_API_URL}/analytics/campaign-sequence?campaign_name=ALL_CAMPAIGNS`
+                    : `${process.env.NEXT_PUBLIC_API_URL}/analytics/campaign-sequence?campaign_name=${encodeURIComponent(selectedCampaign)}`;
                 const response = await axios.get(url);
                 
                 if (isActive) {

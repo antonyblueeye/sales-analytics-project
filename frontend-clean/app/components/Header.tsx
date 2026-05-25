@@ -87,7 +87,7 @@ export default function Header() {
     const panelRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        axios.get('http://localhost:8000/analytics/last-sync')
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/last-sync`)
             .then(res => setLastSync(res.data.last_synced_at))
             .catch(() => {});
     }, []);
@@ -103,7 +103,7 @@ export default function Header() {
         searchDebounceRef.current = setTimeout(async () => {
             setSearchLoading(true);
             try {
-                const res = await axios.get('http://localhost:8000/crm/leads/search', {
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/crm/leads/search`, {
                     params: { q: searchQuery.trim(), limit: DEMO_MODE ? 10 : 3 }
                 });
                 const results: SearchResult[] = DEMO_MODE

@@ -591,8 +591,8 @@ export default function CRMPage() {
         const fetchMetadata = async () => {
             try {
                 const [pRes, cRes] = await Promise.all([
-                    axios.get('http://localhost:8000/profiles'),
-                    axios.get('http://localhost:8000/analytics/campaigns-list')
+                    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/profiles`),
+                    axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-list`)
                 ]);
                 setAllProfiles(pRes.data.map((p: any) => p.name));
                 setAllCampaigns(cRes.data);
@@ -607,8 +607,8 @@ export default function CRMPage() {
         setIsLoading(true);
         try {
             const endpoint = activeTab === 'replied'
-                ? 'http://localhost:8000/crm/replied-leads'
-                : 'http://localhost:8000/crm/leads';
+                ? `${process.env.NEXT_PUBLIC_API_URL}/crm/replied-leads`
+                : `${process.env.NEXT_PUBLIC_API_URL}/crm/leads`;
 
             // Build query params
             const params = new URLSearchParams({
@@ -761,7 +761,7 @@ export default function CRMPage() {
         if (!lead.id) return;
         setIsLoadingActivities(true);
         try {
-            const res = await axios.get(`http://localhost:8000/crm/leads/${lead.id}/activities`);
+            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/crm/leads/${lead.id}/activities`);
             const fetched: LeadActivity[] = (res.data.activities || []).map((a: any) => ({
                 id: a.id,
                 type: a.type,
@@ -804,7 +804,7 @@ export default function CRMPage() {
         const combinedDateTime = `${activityDate}T${activityTime}:00`;
 
         try {
-            await axios.post(`http://localhost:8000/crm/leads/${activeLead.id}/activities`, {
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/crm/leads/${activeLead.id}/activities`, {
                 type: selectedActivity,
                 message: activityMessage,
                 date: new Date(combinedDateTime).toISOString(),
@@ -847,7 +847,7 @@ export default function CRMPage() {
                 campaign_name: newLead.campaign_name || null,
                 profile_name: newLead.profile_name || null,
             };
-            await axios.post('http://localhost:8000/crm/leads', payload);
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/crm/leads`, payload);
             showToast(`Lead "${payload.first_name} ${payload.last_name}" added`);
             setShowAddLeadModal(false);
             setNewLead({
@@ -875,7 +875,7 @@ export default function CRMPage() {
         if (!activeLead) return;
         
         try {
-            await axios.delete(`http://localhost:8000/crm/activities/${activityId}`);
+            await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/crm/activities/${activityId}`);
             
             const updatedLead = {
                 ...activeLead,

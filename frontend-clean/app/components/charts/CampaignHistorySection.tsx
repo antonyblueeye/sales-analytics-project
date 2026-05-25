@@ -77,7 +77,7 @@ export default function CampaignHistorySection() {
   useEffect(() => {
     const fetchCampaigns = async () => {
       try {
-        const res = await axios.get('http://localhost:8000/analytics/campaigns-list');
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-list`);
         setCampaigns(res.data);
         if (res.data.length > 0) setSelectedCampaign(res.data[0]);
       } catch (err) {
@@ -94,7 +94,7 @@ export default function CampaignHistorySection() {
     const fetchHistory = async () => {
       setLoading(true);
       try {
-        const res = await axios.get('http://localhost:8000/analytics/campaign-history', {
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaign-history`, {
           params: { campaign_name: selectedCampaign, granularity }
         });
         setHistoryData(res.data);

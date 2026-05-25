@@ -174,7 +174,7 @@ export default function TemplateConversions() {
     const [filterMetric, setFilterMetric] = useState<MetricKey | 'all'>('all');
 
     useEffect(() => {
-        axios.get('http://localhost:8000/analytics/campaigns-list')
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/campaigns-list`)
             .then(r => setCampaigns(['ALL_CAMPAIGNS', ...r.data]))
             .catch(() => {});
     }, []);
@@ -183,7 +183,7 @@ export default function TemplateConversions() {
         setLoading(true);
         const params: any = {};
         if (selectedCampaign && selectedCampaign !== 'ALL_CAMPAIGNS') params.campaign = selectedCampaign;
-        axios.get('http://localhost:8000/analytics/template-conversions', { params })
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/template-conversions`, { params })
             .then(r => setData(r.data))
             .catch(() => setData([]))
             .finally(() => setLoading(false));

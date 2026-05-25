@@ -63,7 +63,7 @@ export default function FunnelHistorySection() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const res = await axios.get('http://localhost:8000/analytics/funnel-history', {
+        const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/funnel-history`, {
           params: { granularity }
         });
         setData(res.data);
