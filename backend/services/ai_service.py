@@ -3,7 +3,7 @@ from google import genai
 import json
 
 # Setup API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "REDACTED_GEMINI_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 def generate_profiles_insight(profiles_data: list, total_leads: int, total_actions: int) -> str:
@@ -17,10 +17,10 @@ def generate_profiles_insight(profiles_data: list, total_leads: int, total_actio
     import decimal
     
     class DecimalEncoder(json.JSONEncoder):
-        def default(self, obj):
-            if isinstance(obj, decimal.Decimal):
-                return float(obj)
-            return super(DecimalEncoder, self).default(obj)
+        def default(self, o):
+            if isinstance(o, decimal.Decimal):
+                return float(o)
+            return super(DecimalEncoder, self).default(o)
             
     data_summary = json.dumps({
         "overall_metrics": {
@@ -50,7 +50,7 @@ Keep it professional, direct, and use markdown formatting (e.g. bolding) for key
             model='gemini-2.5-flash',
             contents=prompt
         )
-        return response.text.strip()
+        return (response.text or '').strip()
     except Exception as e:
         print(f"Error generating AI insight: {e}")
         return "Unable to generate insights at this moment. Please try again later."

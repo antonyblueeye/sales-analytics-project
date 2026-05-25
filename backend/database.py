@@ -1,10 +1,14 @@
+import os
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from dotenv import load_dotenv
 
-# Строка подключения к PostgreSQL
-# Формат: postgresql://user:password@host:port/database_name
-SQLALCHEMY_DATABASE_URL = "postgresql://postgres:8876700@localhost:5432/meetalfred_db"
+load_dotenv()
+
+
+# Строка подключения к PostgreSQL читается из переменной окружения DATABASE_URL
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/meetalfred_db")
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

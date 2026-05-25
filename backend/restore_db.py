@@ -2,7 +2,7 @@ import sys
 import os
 import subprocess
 
-DB_URL = "postgresql://postgres:8876700@localhost:5432/meetalfred_db"
+DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/meetalfred_db")
 
 def restore_database(backup_file):
     if not os.path.exists(backup_file):

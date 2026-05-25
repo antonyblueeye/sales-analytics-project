@@ -2,8 +2,7 @@ import os
 import subprocess
 from datetime import datetime
 
-# Настройки базы данных
-DB_URL = "postgresql://postgres:8876700@localhost:5432/meetalfred_db"
+DB_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/meetalfred_db")
 
 def backup_database():
     # Создаем папку для бэкапов, если её нет
