@@ -2,12 +2,19 @@
 // When enabled, anonymizes profile names, lead last names, companies,
 // hides links/emails, and provides helpers for blurring avatars and messages.
 //
-// Toggle via NEXT_PUBLIC_DEMO_MODE env var (defaults to true for now since
-// we want the public build to be safe).
-export const DEMO_MODE =
-    typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_DEMO_MODE
-        ? process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
-        : true;
+// Reads the auth role stored by AuthContext in localStorage.
+// Admin role → full data. Guest or unauthenticated → demo mode.
+function resolveDemo(): boolean {
+    if (typeof window === 'undefined') return true; // SSR: safe default
+    try {
+        const role = localStorage.getItem('auth:role');
+        return role !== 'admin';
+    } catch {
+        return true;
+    }
+}
+
+export const DEMO_MODE = resolveDemo();
 
 // Stable mapping: original profile name -> "Profile #N".
 // Persists across renders within a single browser session.

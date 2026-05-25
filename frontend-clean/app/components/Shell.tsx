@@ -1,13 +1,18 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import { useAuth } from '../lib/AuthContext';
 
 const STORAGE_KEY = 'sidebar:collapsed';
 
 export default function Shell({ children }: { children: React.ReactNode }) {
     const [collapsed, setCollapsed] = useState(false);
     const [hydrated, setHydrated] = useState(false);
+    const { role } = useAuth();
+    const pathname = usePathname();
+    const router = useRouter();
 
     // Загружаем сохранённое состояние из localStorage после монтирования,
     // чтобы избежать рассинхрона при SSR
@@ -26,7 +31,23 @@ export default function Shell({ children }: { children: React.ReactNode }) {
         } catch {}
     }, [collapsed, hydrated]);
 
+    // Redirect unauthenticated users to /login
+    useEffect(() => {
+        if (!hydrated) return;
+        if (role === null && pathname !== '/login') {
+            router.replace('/login');
+        }
+    }, [hydrated, role, pathname, router]);
+
     const toggle = () => setCollapsed((v) => !v);
+
+    // Login page renders without shell
+    if (pathname === '/login') {
+        return <>{children}</>;
+    }
+
+    // Don't flash the shell while redirecting
+    if (!role) return null;
 
     return (
         <div className="flex flex-col md:flex-row h-screen overflow-hidden">

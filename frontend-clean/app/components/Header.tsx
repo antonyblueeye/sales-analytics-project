@@ -1,7 +1,8 @@
 'use client';
-import { Search, Bell, RefreshCw, Sparkles, X, Clock, ChevronDown, ChevronUp, User } from 'lucide-react';
+import { Search, Bell, RefreshCw, Sparkles, X, Clock, ChevronDown, ChevronUp, User, LogOut } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '../lib/AuthContext';
 import axios from 'axios';
 import { anonLeadName, anonCompany, BLUR_IMG_CLASS, HIDE_PII, DEMO_MODE } from '../lib/demo';
 
@@ -41,6 +42,33 @@ const searchStatusColors: Record<string, string> = {
     'Engaged': 'text-blue-400', 'Interested': 'text-indigo-400', 'MQL': 'text-amber-400',
     'SQL': 'text-orange-400', 'Partner': 'text-rose-400', 'Client': 'text-green-400',
 };
+
+function AuthBadge() {
+    const { role, logout } = useAuth();
+
+    const handleLogout = () => {
+        logout();
+        window.location.href = '/login';
+    };
+
+    return (
+        <div className="flex items-center gap-2 pl-2">
+            <div className="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 rounded-xl px-3 py-1.5">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${role === 'admin' ? 'bg-indigo-400' : 'bg-emerald-400'}`} />
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                    {role === 'admin' ? 'Admin' : 'Guest'}
+                </span>
+            </div>
+            <button
+                onClick={handleLogout}
+                title="Sign out"
+                className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+            >
+                <LogOut size={15} />
+            </button>
+        </div>
+    );
+}
 
 export default function Header() {
     const router = useRouter();
@@ -334,11 +362,7 @@ export default function Header() {
                     )}
                 </div>
 
-                <div className="flex items-center gap-3 cursor-pointer pl-2">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold shadow-md border-2 border-slate-800">
-                        AN
-                    </div>
-                </div>
+                <AuthBadge />
             </div>
         </header>
     );
