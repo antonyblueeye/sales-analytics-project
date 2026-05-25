@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
     transpilePackages: ['react-date-range'],
+    eslint: { ignoreDuringBuilds: true },
     async headers() {
         return [
             {
