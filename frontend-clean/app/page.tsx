@@ -11,6 +11,7 @@ import {
 } from 'date-fns';
 import axios from 'axios';
 import { saveInsightToHistory } from './components/Header';
+import { anonProfile, BLUR_IMG_CLASS } from './lib/demo';
 
 const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
   ssr: false,
@@ -516,15 +517,15 @@ export default function Dashboard() {
                           <div className="relative shrink-0">
                             <img
                               src={`/${profile.name}.jpg`}
-                              className="w-8 h-8 rounded-full object-cover aspect-square shrink-0 border border-slate-700 ring-2 ring-indigo-500/20 shadow-lg"
-                              alt={profile.name}
+                              className={`w-8 h-8 rounded-full object-cover aspect-square shrink-0 border border-slate-700 ring-2 ring-indigo-500/20 shadow-lg ${BLUR_IMG_CLASS}`}
+                              alt=""
                               onError={(e) => {
                                 (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=4f46e5&color=fff&bold=true`;
                               }}
                             />
                             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full" />
                           </div>
-                          {profile.name}
+                          {anonProfile(profile.name)}
                         </div>
                       </td>
 

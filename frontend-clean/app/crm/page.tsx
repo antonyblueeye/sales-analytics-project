@@ -29,6 +29,9 @@ import {
     Clock,
 } from 'lucide-react';
 import axios from 'axios';
+import { Lock } from 'lucide-react';
+import { anonProfile, anonLeadName, anonCompany, BLUR_IMG_CLASS, HIDE_PII, DEMO_MODE } from '../lib/demo';
+import { DemoMessage } from '../lib/DemoMessage';
 
 interface LeadActivity {
     id: number;
@@ -420,7 +423,7 @@ function ActivityItem({ activity, cfg, isReply, hasMsg, leadPhoto, leadName, sho
     const senderPhoto = isReply
         ? leadPhoto
         : `/${activity.profile}.jpg`;
-    const senderName = isReply ? leadName : (activity.profile || '');
+    const senderName = isReply ? leadName : anonProfile(activity.profile);
     const senderFallback = `https://ui-avatars.com/api/?name=${encodeURIComponent(senderName)}&background=${isReply ? '6366f1' : '4f46e5'}&color=fff&bold=true`;
 
     return (
@@ -470,8 +473,8 @@ function ActivityItem({ activity, cfg, isReply, hasMsg, leadPhoto, leadName, sho
                                 <img
                                     src={senderPhoto}
                                     onError={(e) => { (e.target as HTMLImageElement).src = senderFallback; }}
-                                    className={`w-4 h-4 rounded-full object-cover border ${isReply ? 'border-indigo-500/50' : 'border-slate-600'}`}
-                                    alt={senderName}
+                                    className={`w-4 h-4 rounded-full object-cover border ${isReply ? 'border-indigo-500/50' : 'border-slate-600'} ${BLUR_IMG_CLASS}`}
+                                    alt=""
                                 />
                                 <span className={`text-[10px] font-medium ${isReply ? 'text-indigo-300' : 'text-slate-400'}`}>{senderName}</span>
                             </div>
@@ -501,18 +504,8 @@ function ActivityItem({ activity, cfg, isReply, hasMsg, leadPhoto, leadName, sho
                     <div className="mt-2">
                         <div className={`text-[11px] text-slate-400 leading-relaxed bg-slate-800/50 rounded-xl px-3 py-2 border ${isReply ? 'border-indigo-500/20' : 'border-slate-700/40'}`}>
                             <p className="whitespace-pre-wrap break-words">
-                                {expanded || !isLong
-                                    ? activity.message
-                                    : activity.message!.slice(0, MSG_LIMIT) + '…'}
+                                <DemoMessage text={activity.message} />
                             </p>
-                            {isLong && (
-                                <button
-                                    onClick={() => setExpanded(e => !e)}
-                                    className={`mt-1.5 flex items-center gap-1 text-[10px] font-bold transition-colors ${isReply ? 'text-indigo-400 hover:text-indigo-300' : 'text-slate-500 hover:text-slate-300'}`}
-                                >
-                                    {expanded ? <><ChevronUp size={11} /> Show less</> : <><ChevronDown size={11} /> Show more</>}
-                                </button>
-                            )}
                         </div>
                     </div>
                 )}
@@ -1246,10 +1239,10 @@ export default function CRMPage() {
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-3">
                                         <div className="shrink-0">
-                                            <img src={lead.photo} className="w-10 h-10 rounded-full object-cover aspect-square shrink-0 border-2 border-slate-700 group-hover:border-indigo-500/50 transition-colors" alt="" />
+                                            <img src={lead.photo} className={`w-10 h-10 rounded-full object-cover aspect-square shrink-0 border-2 border-slate-700 group-hover:border-indigo-500/50 transition-colors ${BLUR_IMG_CLASS}`} alt="" />
                                         </div>
                                         <div>
-                                            <div className="text-sm font-semibold text-slate-100">{lead.firstName} {lead.lastName}</div>
+                                            <div className="text-sm font-semibold text-slate-100">{anonLeadName(lead.firstName, lead.lastName)}</div>
                                             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold mt-1 ${statusColors[lead.status]}`}>
                                                 {lead.status}
                                             </span>
@@ -1257,20 +1250,20 @@ export default function CRMPage() {
                                     </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <div className="text-sm text-slate-100 font-medium">{lead.title || lead.company || 'N/A'}</div>
-                                    {lead.title && lead.company && <div className="text-xs text-slate-500">{lead.company}</div>}
+                                    <div className="text-sm text-slate-100 font-medium">{lead.title || (DEMO_MODE ? 'N/A' : lead.company) || 'N/A'}</div>
+                                    {lead.title && lead.company && <div className="text-xs text-slate-500">{DEMO_MODE ? anonCompany(lead.company) : lead.company}</div>}
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="text-sm text-slate-300">{lead.location || 'Unknown'}</div>
                                 </td>
                                 <td className="px-6 py-4 text-right">
                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        {lead.linkedinUrl && (
+                                        {!HIDE_PII && lead.linkedinUrl && (
                                             <a href={lead.linkedinUrl} target="_blank" onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-slate-700/50 rounded-md transition-colors">
                                                 <img src="/linkedin_icon.png" className="w-4 h-4 object-contain" alt="LinkedIn" />
                                             </a>
                                         )}
-                                        {lead.email && (
+                                        {!HIDE_PII && lead.email && (
                                             <a href={`mailto:${lead.email}`} onClick={(e) => e.stopPropagation()} className="p-1.5 hover:bg-slate-700 rounded-md text-emerald-400">
                                                 <Mail size={16} />
                                             </a>
@@ -1374,11 +1367,11 @@ export default function CRMPage() {
                             <div className="p-6 border-b border-slate-800 flex items-start justify-between">
                                 <div className="flex gap-4">
                                     <div className="shrink-0">
-                                        <img src={activeLead?.photo} className="w-20 h-20 rounded-2xl object-cover aspect-square shrink-0 border-2 border-slate-700" alt="" />
+                                        <img src={activeLead?.photo} className={`w-20 h-20 rounded-2xl object-cover aspect-square shrink-0 border-2 border-slate-700 ${BLUR_IMG_CLASS}`} alt="" />
                                     </div>
                                     <div className="pt-1">
-                                        <h2 className="text-xl font-bold text-slate-100">{activeLead?.firstName} {activeLead?.lastName}</h2>
-                                        <p className="text-slate-400 text-sm mt-0.5">{activeLead?.title} @ <span className="text-indigo-400 font-medium">{activeLead?.company}</span></p>
+                                        <h2 className="text-xl font-bold text-slate-100">{anonLeadName(activeLead?.firstName, activeLead?.lastName)}</h2>
+                                        <p className="text-slate-400 text-sm mt-0.5">{activeLead?.title}{activeLead?.title && (activeLead?.company || DEMO_MODE) ? ' @ ' : ''}<span className="text-indigo-400 font-medium">{DEMO_MODE ? anonCompany(activeLead?.company) : activeLead?.company}</span></p>
                                         <div className="mt-3 flex items-center gap-2">
                                             <span className={`inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold border ${statusColors[activeLead?.status || 'New'] || statusColors['New']}`}>
                                                 {activeLead?.status}
@@ -1410,6 +1403,7 @@ export default function CRMPage() {
                             {/* Drawer Content */}
                             <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
                                 {/* Contact Details */}
+                                {!HIDE_PII && (
                                 <section>
                                     <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Contact Information</h3>
                                     <div className="grid grid-cols-2 gap-3">
@@ -1458,6 +1452,7 @@ export default function CRMPage() {
                                         )}
                                     </div>
                                 </section>
+                                )}
 
                                 {/* Campaigns & Profiles */}
                                 <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1491,12 +1486,12 @@ export default function CRMPage() {
                                                                 onError={(e) => {
                                                                     (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=4f46e5&color=fff&bold=true`;
                                                                 }}
-                                                                className="w-7 h-7 rounded-full object-cover border border-slate-600 ring-2 ring-transparent group-hover/profile:ring-indigo-500/50 transition-all shadow-md"
-                                                                alt={name}
+                                                                className={`w-7 h-7 rounded-full object-cover border border-slate-600 ring-2 ring-transparent group-hover/profile:ring-indigo-500/50 transition-all shadow-md ${BLUR_IMG_CLASS}`}
+                                                                alt=""
                                                             />
                                                             <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-slate-900 rounded-full shadow-sm" />
                                                         </div>
-                                                        <span className="text-[11px] text-slate-300 font-bold whitespace-nowrap">{name}</span>
+                                                        <span className="text-[11px] text-slate-300 font-bold whitespace-nowrap">{anonProfile(name)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -1505,9 +1500,20 @@ export default function CRMPage() {
                                 </section>
 
                                 {/* Log Activity */}
-                                <section>
+                                <section className="relative">
                                     <h3 className="text-xs uppercase font-bold text-slate-500 tracking-wider mb-4">Log Activity</h3>
-                                    <div className="bg-slate-800/50 border border-slate-700 rounded-2xl p-4 space-y-4">
+                                    {DEMO_MODE && (
+                                        <div className="absolute inset-0 top-7 z-30 rounded-2xl backdrop-blur-md bg-slate-900/40 border border-slate-700 flex flex-col items-center justify-center gap-3 text-center px-6">
+                                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center shadow-lg">
+                                                <Lock size={20} className="text-indigo-300" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-bold text-white">Activity logging is locked</p>
+                                                <p className="text-xs text-slate-400 mt-1 max-w-xs">This is a public demo build. Logging is disabled to keep customer data read-only.</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className={`bg-slate-800/50 border border-slate-700 rounded-2xl p-4 space-y-4 ${DEMO_MODE ? 'pointer-events-none select-none' : ''}`}>
                                         <div className="flex flex-col gap-4">
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                                 {/* Profile Selector Dropdown */}
@@ -1736,10 +1742,10 @@ export default function CRMPage() {
                                                                 <img
                                                                     src={`/${activityProfileFilter}.jpg`}
                                                                     onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(activityProfileFilter)}&background=4f46e5&color=fff&bold=true`; }}
-                                                                    className="w-4 h-4 rounded-full object-cover border border-slate-600 shrink-0 pointer-events-none"
-                                                                    alt={activityProfileFilter}
+                                                                    className={`w-4 h-4 rounded-full object-cover border border-slate-600 shrink-0 pointer-events-none ${BLUR_IMG_CLASS}`}
+                                                                    alt=""
                                                                 />
-                                                                <span className="text-[11px] font-bold text-slate-300 pr-1">{activityProfileFilter}</span>
+                                                                <span className="text-[11px] font-bold text-slate-300 pr-1">{activityProfileFilter === 'all' ? 'All Profiles' : anonProfile(activityProfileFilter)}</span>
                                                                 <ChevronDown size={11} className={`text-slate-500 transition-transform duration-200 ${isActivityProfileDropdownOpen ? 'rotate-180' : ''}`} />
                                                             </button>
 
@@ -1761,14 +1767,14 @@ export default function CRMPage() {
                                                                                 <img
                                                                                     src={`/${p}.jpg`}
                                                                                     onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(p)}&background=4f46e5&color=fff&bold=true`; }}
-                                                                                    className={`w-6 h-6 rounded-full object-cover border transition-all ${p === activityProfileFilter ? 'border-indigo-500 scale-110' : 'border-slate-700 group-hover:border-slate-500'}`}
-                                                                                    alt={p}
+                                                                                    className={`w-6 h-6 rounded-full object-cover border transition-all ${p === activityProfileFilter ? 'border-indigo-500 scale-110' : 'border-slate-700 group-hover:border-slate-500'} ${BLUR_IMG_CLASS}`}
+                                                                                    alt=""
                                                                                 />
                                                                                 {p === activityProfileFilter && (
                                                                                     <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-indigo-500 rounded-full border-2 border-slate-900" />
                                                                                 )}
                                                                             </div>
-                                                                            <span className={`text-[11px] font-bold transition-colors ${p === activityProfileFilter ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>{p}</span>
+                                                                            <span className={`text-[11px] font-bold transition-colors ${p === activityProfileFilter ? 'text-white' : 'text-slate-400 group-hover:text-slate-200'}`}>{anonProfile(p)}</span>
                                                                             {p === activityProfileFilter && (
                                                                                 <div className="ml-auto">
                                                                                     <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
@@ -1784,10 +1790,10 @@ export default function CRMPage() {
                                                             <img
                                                                 src={`/${dbProfiles[0]}.jpg`}
                                                                 onError={(e) => { (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(dbProfiles[0])}&background=4f46e5&color=fff&bold=true`; }}
-                                                                className="w-4 h-4 rounded-full object-cover border border-slate-600"
-                                                                alt={dbProfiles[0]}
+                                                                className={`w-4 h-4 rounded-full object-cover border border-slate-600 ${BLUR_IMG_CLASS}`}
+                                                                alt=""
                                                             />
-                                                            <span className="text-[11px] font-bold text-slate-400">{dbProfiles[0]}</span>
+                                                            <span className="text-[11px] font-bold text-slate-400">{anonProfile(dbProfiles[0])}</span>
                                                         </div>
                                                     ) : null}
                                                 </div>
@@ -1823,7 +1829,7 @@ export default function CRMPage() {
                                                                     isReply={isReply}
                                                                     hasMsg={hasMsg}
                                                                     leadPhoto={activeLead.photo}
-                                                                    leadName={`${activeLead.firstName} ${activeLead.lastName}`}
+                                                                    leadName={anonLeadName(activeLead.firstName, activeLead.lastName)}
                                                                     showProfile={false}
                                                                     onDelete={handleDeleteActivity}
                                                                 />

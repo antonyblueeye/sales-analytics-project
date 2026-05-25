@@ -8,6 +8,8 @@ import {
     UserCheck, Star, Send, Globe, ChevronRight
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
+import { anonProfile, anonLeadName, anonCompany, BLUR_IMG_CLASS, HIDE_PII, DEMO_MODE } from '../../lib/demo';
+import { DemoMessage } from '../../lib/DemoMessage';
 
 const statusColors: Record<string, string> = {
     'New':        'bg-slate-500/10 text-slate-400 border-slate-500/20',
@@ -88,7 +90,7 @@ export default function LeadPage() {
         );
     }
 
-    const fullName = `${lead.first_name} ${lead.last_name}`.trim();
+    const fullName = anonLeadName(lead.first_name, lead.last_name);
     const initials = `${lead.first_name?.[0] || ''}${lead.last_name?.[0] || ''}`.toUpperCase();
     const statusCls = statusColors[lead.status] || statusColors['New'];
     const messages = lead.messages || [];
@@ -108,7 +110,7 @@ export default function LeadPage() {
                     Back
                 </button>
                 <ChevronRight size={14} className="text-slate-600" />
-                <span className="text-sm text-slate-300 font-medium">{fullName}</span>
+                <span className="text-sm text-slate-300 font-medium">{anonLeadName(lead.first_name, lead.last_name)}</span>
                 <span className={`ml-2 px-2 py-0.5 rounded-full text-[11px] font-bold border ${statusCls}`}>{lead.status}</span>
             </div>
 
@@ -118,7 +120,7 @@ export default function LeadPage() {
                     {/* Avatar + name */}
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl p-5 flex flex-col items-center text-center gap-3">
                         {lead.photo_url ? (
-                            <img src={lead.photo_url} alt={fullName} className="w-20 h-20 rounded-full object-cover ring-2 ring-slate-700" />
+                            <img src={lead.photo_url} alt="" className={`w-20 h-20 rounded-full object-cover ring-2 ring-slate-700 ${BLUR_IMG_CLASS}`} />
                         ) : (
                             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-2xl font-bold ring-2 ring-slate-700">
                                 {initials}
@@ -127,7 +129,7 @@ export default function LeadPage() {
                         <div>
                             <h2 className="text-lg font-bold text-white">{fullName}</h2>
                             {lead.title && <p className="text-xs text-slate-400 mt-0.5">{lead.title}</p>}
-                            {lead.company_name && <p className="text-xs text-slate-500 mt-0.5">{lead.company_name}</p>}
+                            {lead.company_name && <p className="text-xs text-slate-500 mt-0.5">{DEMO_MODE ? anonCompany(lead.company_name) : lead.company_name}</p>}
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-bold border ${statusCls}`}>{lead.status}</span>
                     </div>
@@ -135,7 +137,7 @@ export default function LeadPage() {
                     {/* Contact info */}
                     <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 flex flex-col gap-2.5">
                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Contact Info</h3>
-                        {lead.email && (
+                        {!HIDE_PII && lead.email && (
                             <div className="flex items-center gap-2 text-xs text-slate-300">
                                 <Mail size={13} className="text-slate-500 shrink-0" />
                                 <span className="truncate">{lead.email}</span>
@@ -151,7 +153,7 @@ export default function LeadPage() {
                         {lead.company_name && (
                             <div className="flex items-center gap-2 text-xs text-slate-300">
                                 <Briefcase size={13} className="text-slate-500 shrink-0" />
-                                <span>{lead.company_name}</span>
+                                <span>{DEMO_MODE ? anonCompany(lead.company_name) : lead.company_name}</span>
                             </div>
                         )}
                         {lead.created_at && (
@@ -160,7 +162,7 @@ export default function LeadPage() {
                                 <span>Since {format(parseISO(lead.created_at), 'MMM d, yyyy')}</span>
                             </div>
                         )}
-                        {lead.linkedin_url && (
+                        {!HIDE_PII && lead.linkedin_url && (
                             <a
                                 href={lead.linkedin_url}
                                 target="_blank"
@@ -192,7 +194,7 @@ export default function LeadPage() {
                                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Profiles</h3>
                                     <div className="flex flex-wrap gap-1">
                                         {lead.profile_names.map((p: string) => (
-                                            <span key={p} className="text-xs text-slate-400 bg-slate-700/30 border border-slate-700 rounded-full px-2 py-0.5">{p}</span>
+                                            <span key={p} className="text-xs text-slate-400 bg-slate-700/30 border border-slate-700 rounded-full px-2 py-0.5">{anonProfile(p)}</span>
                                         ))}
                                     </div>
                                 </div>
@@ -270,7 +272,7 @@ export default function LeadPage() {
                                                     )}
                                                     {act.message && (
                                                         <div className="mt-2 text-xs text-slate-300 bg-slate-900/60 rounded-lg p-2.5 border border-slate-700/50 leading-relaxed">
-                                                            {act.message}
+                                                            <DemoMessage text={act.message} />
                                                         </div>
                                                     )}
                                                 </div>
@@ -302,8 +304,8 @@ export default function LeadPage() {
                                                 ? 'bg-indigo-600/20 text-indigo-100 border border-indigo-500/20'
                                                 : 'bg-slate-700/50 text-slate-200 border border-slate-700'
                                         }`}>
-                                            <p>{msg.text}</p>
-                                            <p className="text-[10px] opacity-50 mt-1">{msg.timestamp}{msg.profile_name && msg.profile_name !== 'Unknown' ? ` · ${msg.profile_name}` : ''}</p>
+                                            <p><DemoMessage text={msg.text} /></p>
+                                            <p className="text-[10px] opacity-50 mt-1">{msg.timestamp}{msg.profile_name && msg.profile_name !== 'Unknown' ? ` · ${anonProfile(msg.profile_name)}` : ''}</p>
                                         </div>
                                     </div>
                                 ))

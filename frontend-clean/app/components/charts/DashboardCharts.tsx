@@ -6,6 +6,8 @@ import {
 } from 'recharts';
 import { ChevronLeft, ChevronRight, LayoutPanelTop, Target, Play, Pause, ExternalLink, MessageSquare, User, Briefcase } from 'lucide-react';
 import CustomSelect from '../CustomSelect';
+import { anonProfile, anonLeadName, BLUR_IMG_CLASS, HIDE_PII, DEMO_MODE } from '../../lib/demo';
+import { DemoMessage } from '../../lib/DemoMessage';
 
 interface DashboardChartsProps {
   dailyData: any[];
@@ -418,7 +420,7 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
                 <div className="w-full h-full rounded-full border border-slate-600/50 overflow-hidden bg-slate-800">
                   <img 
                     src={bubble.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(bubble.first_name + ' ' + bubble.last_name)}&background=random`} 
-                    className="w-full h-full object-cover"
+                    className={`w-full h-full object-cover ${BLUR_IMG_CLASS}`}
                     alt="" 
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(bubble.first_name + ' ' + bubble.last_name)}&background=random`;
@@ -439,7 +441,7 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
             <div className="flex items-center gap-3">
               <img 
                 src={selected.photo_url} 
-                className="w-10 h-10 rounded-xl border border-slate-700 object-cover shrink-0 shadow-lg" 
+                className={`w-10 h-10 rounded-xl border border-slate-700 object-cover shrink-0 shadow-lg ${BLUR_IMG_CLASS}`}
                 alt="" 
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selected.first_name + ' ' + selected.last_name)}&background=4f46e5&color=fff&bold=true`;
@@ -447,8 +449,8 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
               />
               <div className="min-w-0">
                 <div className="text-sm font-bold text-white flex items-center gap-2 truncate">
-                  {selected.first_name} {selected.last_name}
-                  {selected.linkedin_url && (
+                  {anonLeadName(selected.first_name, selected.last_name)}
+                  {!HIDE_PII && selected.linkedin_url && (
                     <a href={selected.linkedin_url} target="_blank" className="text-slate-500 hover:text-indigo-400 transition-colors shrink-0">
                       <ExternalLink size={12} />
                     </a>
@@ -462,15 +464,17 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
           </div>
 
           <div className="space-y-2.5 flex-grow overflow-y-auto pr-1 custom-scrollbar">
-            <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 flex items-start gap-2.5 transition-colors hover:bg-slate-800/60">
-              <div className="p-1.5 bg-indigo-500/10 rounded-lg shrink-0">
-                <Briefcase size={10} className="text-indigo-400" />
+            {!DEMO_MODE && (
+              <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 flex items-start gap-2.5 transition-colors hover:bg-slate-800/60">
+                <div className="p-1.5 bg-indigo-500/10 rounded-lg shrink-0">
+                  <Briefcase size={10} className="text-indigo-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[8px] text-slate-500 uppercase font-bold">Campaign</p>
+                  <p className="text-[10px] text-slate-200 truncate">{selected.campaign_name || 'N/A'}</p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <p className="text-[8px] text-slate-500 uppercase font-bold">Campaign</p>
-                <p className="text-[10px] text-slate-200 truncate">{selected.campaign_name || 'N/A'}</p>
-              </div>
-            </div>
+            )}
 
             <div className="bg-slate-800/40 rounded-xl p-2.5 border border-slate-700/30 flex items-start gap-2.5 transition-colors hover:bg-slate-800/60">
               <div className="p-1.5 bg-pink-500/10 rounded-lg shrink-0">
@@ -478,7 +482,7 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
               </div>
               <div className="min-w-0">
                 <p className="text-[8px] text-slate-500 uppercase font-bold">From Profile</p>
-                <p className="text-[10px] text-slate-200 truncate">{selected.profile_name || 'Unknown'}</p>
+                <p className="text-[10px] text-slate-200 truncate">{anonProfile(selected.profile_name)}</p>
               </div>
             </div>
 
@@ -487,10 +491,10 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
                 <MessageSquare size={40} className="text-indigo-400" />
               </div>
               <p className="text-[8px] text-indigo-400 uppercase font-bold mb-2 flex items-center gap-2">
-                 Full Reply
+                 Reply Preview
               </p>
               <div className="text-[11px] text-slate-300 italic leading-relaxed relative z-10">
-                "{selected.message || 'No message text available.'}"
+                "<DemoMessage text={selected.message || 'No message text available.'} />"
               </div>
             </div>
           </div>
