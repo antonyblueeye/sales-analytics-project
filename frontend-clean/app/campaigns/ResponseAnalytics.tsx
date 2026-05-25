@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { anonProfile } from '../lib/demo';
 import { 
     Loader2, 
     Zap, 
@@ -155,7 +156,7 @@ export default function ResponseAnalytics() {
                                     : 'bg-slate-800/30 border-slate-700/50 text-slate-500 hover:border-slate-600'
                                 }`}
                             >
-                                {profile.name}
+                                {anonProfile(profile.name)}
                             </button>
                         ))}
                         {selectedProfiles.length > 0 && (

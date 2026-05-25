@@ -11,7 +11,7 @@ import {
 } from 'date-fns';
 import axios from 'axios';
 import { saveInsightToHistory } from './components/Header';
-import { anonProfile, BLUR_IMG_CLASS } from './lib/demo';
+import { anonProfile, BLUR_IMG_CLASS, DEMO_MODE } from './lib/demo';
 
 const DashboardCharts = dynamic(() => import('./components/charts/DashboardCharts'), {
   ssr: false,
@@ -211,9 +211,18 @@ export default function Dashboard() {
       const res = await axios.get('http://localhost:8000/analytics/ai-insights', {
         params: { from_date: format(startDate, 'yyyy-MM-dd'), to_date: format(endDate, 'yyyy-MM-dd') }
       });
-      setAiInsight(res.data.insight);
+      let insightText: string = res.data.insight;
+      if (DEMO_MODE && profiles.length > 0) {
+        // Replace real profile names with Profile #N (longest names first to avoid partial matches)
+        const sorted = [...profiles].sort((a, b) => b.name.length - a.name.length);
+        sorted.forEach(p => {
+          const anon = anonProfile(p.name);
+          insightText = insightText.replace(new RegExp(p.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), anon);
+        });
+      }
+      setAiInsight(insightText);
       saveInsightToHistory({
-        text: res.data.insight,
+        text: insightText,
         generatedAt: new Date().toISOString(),
         dateRange: `${format(startDate, 'MMM d')} – ${format(endDate, 'MMM d, yyyy')}`
       });
@@ -223,7 +232,7 @@ export default function Dashboard() {
     } finally {
       setIsInsightLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, profiles]);
 
   // Функция для запроса данных из Python бэкенда
   const fetchProfiles = useCallback(async () => {

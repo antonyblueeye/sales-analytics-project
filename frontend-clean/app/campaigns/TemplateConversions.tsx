@@ -7,6 +7,7 @@ import {
     Loader2, BarChart3, Trophy, Zap
 } from 'lucide-react';
 import CustomSelect from '../components/CustomSelect';
+import { DemoMessage } from '../lib/DemoMessage';
 
 interface TemplateConversion {
     id: number;
@@ -107,7 +108,7 @@ function TemplateCard({ template, rank, maxConversions }: {
                         )}
                     </div>
                     <p className="text-sm text-slate-300 leading-relaxed">
-                        {expanded ? template.text : truncate(template.text, 180)}
+                        <DemoMessage text={template.text} />
                     </p>
                 </div>
 

@@ -629,10 +629,10 @@ export default function CRMPage() {
                 params.set('status', tabStatusMap[activeTab]);
             }
 
-            if (currentFilters.search) params.append('search', currentFilters.search);
+            if (currentFilters.search) params.append(DEMO_MODE ? 'first_name' : 'search', currentFilters.search);
             if (currentFilters.firstName) params.append('first_name', currentFilters.firstName);
-            if (currentFilters.lastName) params.append('last_name', currentFilters.lastName);
-            if (currentFilters.company) params.append('company', currentFilters.company);
+            if (!DEMO_MODE && currentFilters.lastName) params.append('last_name', currentFilters.lastName);
+            if (!DEMO_MODE && currentFilters.company) params.append('company', currentFilters.company);
             if (currentFilters.location) params.append('location', currentFilters.location);
             if (currentFilters.position) params.append('title', currentFilters.position);
 
@@ -1035,6 +1035,7 @@ export default function CRMPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        {!DEMO_MODE ? (
                         <button
                             onClick={() => setShowAddLeadModal(true)}
                             className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-400 hover:to-purple-400 text-white shadow-lg shadow-indigo-900/40 transition-all"
@@ -1042,6 +1043,20 @@ export default function CRMPage() {
                             <UserPlus size={18} />
                             Add Lead
                         </button>
+                        ) : (
+                        <div className="relative group">
+                            <button
+                                disabled
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-slate-700/50 text-slate-500 border border-slate-700 cursor-not-allowed"
+                            >
+                                <Lock size={14} className="text-slate-600" />
+                                Add Lead
+                            </button>
+                            <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-800 border border-slate-700 text-slate-300 text-[10px] px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                                Locked in demo build
+                            </div>
+                        </div>
+                        )}
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                             <input
@@ -1089,6 +1104,7 @@ export default function CRMPage() {
                                     onChange={(e) => setFilterFirstName(e.target.value)}
                                 />
                             </div>
+                            {!DEMO_MODE && (
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs text-slate-400 font-medium ml-1">Last Name</label>
                                 <input
@@ -1099,6 +1115,7 @@ export default function CRMPage() {
                                     onChange={(e) => setFilterLastName(e.target.value)}
                                 />
                             </div>
+                            )}
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs text-slate-400 font-medium ml-1">Campaign</label>
                                 <input
@@ -1172,6 +1189,7 @@ export default function CRMPage() {
                                     onChange={(e) => setFilterPosition(e.target.value)}
                                 />
                             </div>
+                            {!DEMO_MODE && (
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs text-slate-400 font-medium ml-1">Company</label>
                                 <input
@@ -1182,6 +1200,7 @@ export default function CRMPage() {
                                     onChange={(e) => setFilterCompany(e.target.value)}
                                 />
                             </div>
+                            )}
                             <div className="flex flex-col gap-1">
                                 <label className="text-xs text-slate-400 font-medium ml-1">Location</label>
                                 <input

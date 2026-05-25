@@ -102,7 +102,7 @@ const PieGroup = ({ title, data, dataKeys, labels, type, onTypeChange }: { title
                 </div>
               </div>
               <p className="text-[11px] font-semibold text-slate-300 mt-1 truncate w-full text-center">
-                {profile.name.split(' ')[0]}
+                {anonProfile(profile.name)}
               </p>
             </div>
           );

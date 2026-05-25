@@ -3,6 +3,7 @@ import { Search, Bell, RefreshCw, Sparkles, X, Clock, ChevronDown, ChevronUp, Us
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { anonLeadName, anonCompany, BLUR_IMG_CLASS, HIDE_PII, DEMO_MODE } from '../lib/demo';
 
 const INSIGHTS_STORAGE_KEY = 'ai:insights:history';
 const INSIGHTS_READ_KEY = 'ai:insights:lastReadAt';
@@ -75,10 +76,15 @@ export default function Header() {
             setSearchLoading(true);
             try {
                 const res = await axios.get('http://localhost:8000/crm/leads/search', {
-                    params: { q: searchQuery.trim(), limit: 3 }
+                    params: { q: searchQuery.trim(), limit: DEMO_MODE ? 10 : 3 }
                 });
-                setSearchResults(res.data);
-                setSearchOpen(res.data.length > 0);
+                const results: SearchResult[] = DEMO_MODE
+                    ? res.data.filter((r: SearchResult) =>
+                        r.first_name?.toLowerCase().startsWith(searchQuery.trim().toLowerCase()))
+                    : res.data;
+                const capped = results.slice(0, 3);
+                setSearchResults(capped);
+                setSearchOpen(capped.length > 0);
             } catch {}
             finally { setSearchLoading(false); }
         }, 280);
@@ -204,7 +210,7 @@ export default function Header() {
                                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800 transition-colors text-left group"
                                 >
                                     {r.photo_url ? (
-                                        <img src={r.photo_url} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                                        <img src={r.photo_url} alt="" className={`w-8 h-8 rounded-full object-cover shrink-0 ${BLUR_IMG_CLASS}`} />
                                     ) : (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
                                             {initials}
@@ -212,9 +218,10 @@ export default function Header() {
                                     )}
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-medium text-slate-200 group-hover:text-white truncate">
-                                            {r.first_name} {r.last_name}
+                                            {anonLeadName(r.first_name, r.last_name)}
                                         </p>
-                                        <p className="text-xs text-slate-500 truncate">{r.company_name}{r.title ? ` · ${r.title}` : ''}</p>
+                                        {!HIDE_PII && <p className="text-xs text-slate-500 truncate">{r.company_name}{r.title ? ` · ${r.title}` : ''}</p>}
+                                        {HIDE_PII && r.title && <p className="text-xs text-slate-500 truncate">{r.title}</p>}
                                     </div>
                                     <span className={`text-[10px] font-bold shrink-0 ${statusColor}`}>{r.status}</span>
                                 </button>

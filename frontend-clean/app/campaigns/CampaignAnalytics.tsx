@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { DemoMessage } from '../lib/DemoMessage';
 
 interface Template {
     id: number;
@@ -85,7 +86,7 @@ const TemplateCard = ({
 
                 <div className="relative overflow-hidden h-10 opacity-70">
                     <div className="text-slate-400 text-[10px] leading-snug whitespace-pre-wrap line-clamp-3">
-                        {template.text}
+                        <DemoMessage text={template.text} />
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent pointer-events-none" />
                 </div>
@@ -159,7 +160,7 @@ const MessagePreview = ({ template }: { template: Template | null }) => {
 
             <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-950/30 rounded-lg p-3 border border-slate-800/50">
                 <div className="text-slate-300 text-[11px] leading-relaxed whitespace-pre-wrap antialiased">
-                    {template.text}
+                    <DemoMessage text={template.text} />
                 </div>
             </div>
 
