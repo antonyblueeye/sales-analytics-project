@@ -9,6 +9,9 @@ const inter = Inter({ subsets: ['latin'] });
 export const metadata: Metadata = {
   title: 'Sales Analytics',
   description: 'LinkedIn automation dashboard',
+  icons: {
+    icon: '/bar_icon.png',
+  },
 };
 
 export default function RootLayout({
