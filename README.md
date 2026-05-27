@@ -1,57 +1,57 @@
 # LinkedIn Outreach Analytics Platform
 
-Веб-приложение для аналитики LinkedIn outreach-кампаний на базе [MeetAlfred](https://meetalfred.com/). Отслеживает кампании, лидов, ответы и сообщения, визуализирует воронки и генерирует AI-инсайты.
+A web application for analyzing LinkedIn outreach campaigns powered by [MeetAlfred](https://meetalfred.com/). It tracks campaigns, leads, replies, and messages, visualizes funnels, and generates AI-driven insights.
 
 **Live demo:** https://sales-analytics-project.vercel.app/
-Войти как **Guest** — увидишь все дашборды с анонимизированными данными (имена лидов, компании и тексты сообщений скрыты).
+Log in as **Guest** to see all dashboards with anonymized data (lead names, companies, and message texts are hidden).
 
 ---
 
-## Возможности
+## Features
 
-- **Главный дашборд** — суммарная аналитика по invites/replies/connections, динамика по дням, сравнение с предыдущим периодом
-- **Кампании** — детальная аналитика по каждой кампании, sequence-сообщений, конверсии шаблонов
-- **CRM** — список всех лидов с фильтрами (имя, компания, локация, статус, период активности), карточка лида с историей активности и перепиской
-- **Анализ сообщений** — статистика по шаблонам, ответам, кастомным сообщениям
-- **Карта мира** — географическое распределение лидов
-- **AI-инсайты** — Google Gemini анализирует данные за выбранный период и выдаёт рекомендации
-- **Demo-режим** — гостевой доступ с полной анонимизацией PII (личные имена, компании, тексты сообщений размываются)
+- **Main dashboard** — aggregated analytics for invites/replies/connections, daily trends, and period-over-period comparison
+- **Campaigns** — detailed analytics for each campaign, message sequences, and template conversion rates
+- **CRM** — full list of leads with filters (name, company, location, status, activity period), lead detail card with activity history and messaging
+- **Message analytics** — statistics on templates, replies, and custom messages
+- **World map** — geographic distribution of leads
+- **AI insights** — Google Gemini analyzes data for the selected period and provides recommendations
+- **Demo mode** — public guest access with full PII anonymization (personal names, companies, and message texts are blurred)
 
 ---
 
-## Технологический стек
+## Tech stack
 
 ### Backend
 - **Python** + **FastAPI** — REST API
 - **SQLAlchemy** — ORM
-- **PostgreSQL** — база данных
-- **Pydantic** — валидация
-- **APScheduler** — автоматическая синхронизация в фоне
-- **httpx** — клиент для MeetAlfred API
-- **Google Gemini API** — генерация AI-инсайтов
+- **PostgreSQL** — database
+- **Pydantic** — validation
+- **APScheduler** — background data sync
+- **httpx** — client for the MeetAlfred API
+- **Google Gemini API** — AI insights generation
 
 ### Frontend
 - **Next.js 14** (App Router) + **React 18** + **TypeScript**
-- **Tailwind CSS** — стили
-- **Recharts** — графики
-- **react-simple-maps** + **D3** — интерактивная карта
-- **Framer Motion** — анимации
-- **Axios** — HTTP-клиент
+- **Tailwind CSS** — styling
+- **Recharts** — charts
+- **react-simple-maps** + **D3** — interactive world map
+- **Framer Motion** — animations
+- **Axios** — HTTP client
 
-### Инфраструктура
-- **Railway** — backend + PostgreSQL
-- **Vercel** — frontend (auto-deploy из main ветки)
-- **GitHub** — версионный контроль и CI/CD
+### Infrastructure
+- **Railway** — backend + PostgreSQL hosting
+- **Vercel** — frontend hosting (auto-deploy from `main`)
+- **GitHub** — version control and CI/CD
 
 ---
 
-## Архитектура
+## Architecture
 
 ```
 ┌─────────────────┐         ┌──────────────────┐         ┌─────────────────┐
 │                 │         │                  │         │                 │
-│  Next.js (Vercel) │ ◄─────► │  FastAPI (Railway) │ ◄─────► │  PostgreSQL     │
-│                 │  HTTPS  │                  │   SQL   │  (Railway)      │
+│ Next.js (Vercel)│ ◄─────► │ FastAPI (Railway)│ ◄─────► │   PostgreSQL    │
+│                 │  HTTPS  │                  │   SQL   │   (Railway)     │
 └─────────────────┘         └────────┬─────────┘         └─────────────────┘
                                      │
                                      │ Background sync
@@ -64,41 +64,41 @@
 
 ---
 
-## Структура проекта
+## Project structure
 
 ```
 sales_project/
-├── backend/                    # FastAPI приложение
-│   ├── main.py                 # Точка входа, роуты
-│   ├── models.py               # SQLAlchemy модели
-│   ├── database.py             # Подключение к БД
-│   ├── analytics.py            # Бизнес-логика аналитики
-│   ├── crm.py                  # CRM-логика (лиды, активности)
-│   ├── scheduler.py            # APScheduler фоновые задачи
+├── backend/                    # FastAPI application
+│   ├── main.py                 # Entry point, routes
+│   ├── models.py               # SQLAlchemy models
+│   ├── database.py             # DB connection
+│   ├── analytics.py            # Analytics business logic
+│   ├── crm.py                  # CRM logic (leads, activities)
+│   ├── scheduler.py            # APScheduler background jobs
 │   ├── services/
-│   │   ├── meetalfred_client.py  # Интеграция с MeetAlfred
-│   │   └── ai_service.py         # Интеграция с Gemini
+│   │   ├── meetalfred_client.py  # MeetAlfred integration
+│   │   └── ai_service.py         # Gemini integration
 │   ├── requirements.txt
-│   ├── Procfile                # Команда запуска для Railway
+│   ├── Procfile                # Start command for Railway
 │   └── .env.example
 │
-├── frontend-clean/             # Next.js приложение
+├── frontend-clean/             # Next.js application
 │   ├── app/
-│   │   ├── page.tsx            # Главный дашборд
-│   │   ├── layout.tsx          # Корневой layout
-│   │   ├── login/              # Страница входа (Guest/Admin)
-│   │   ├── crm/                # CRM с лидами
-│   │   ├── campaigns/          # Аналитика кампаний и сообщений
-│   │   ├── leads/              # Аналитика по лидам
-│   │   ├── settings/           # Гайд по приложению
-│   │   ├── components/         # Header, Sidebar, графики
+│   │   ├── page.tsx            # Main dashboard
+│   │   ├── layout.tsx          # Root layout
+│   │   ├── login/              # Login page (Guest/Admin)
+│   │   ├── crm/                # CRM with leads
+│   │   ├── campaigns/          # Campaign and message analytics
+│   │   ├── leads/              # Lead analytics
+│   │   ├── settings/           # In-app guide
+│   │   ├── components/         # Header, Sidebar, charts
 │   │   ├── lib/
-│   │   │   ├── AuthContext.tsx # Аутентификация (Guest/Admin)
-│   │   │   ├── demo.ts         # Логика demo-режима и анонимизации
-│   │   │   └── DemoMessage.tsx # Размытие текстов в demo
-│   │   └── api/client.ts       # Axios инстанс
+│   │   │   ├── AuthContext.tsx # Authentication (Guest/Admin)
+│   │   │   ├── demo.ts         # Demo mode and anonymization logic
+│   │   │   └── DemoMessage.tsx # Text blurring in demo mode
+│   │   └── api/client.ts       # Axios instance
 │   ├── package.json
-│   ├── next.config.mjs         # CSP-заголовки, конфиг
+│   ├── next.config.mjs         # CSP headers, config
 │   └── .env.example
 │
 └── README.md
@@ -106,9 +106,9 @@ sales_project/
 
 ---
 
-## Запуск локально
+## Local setup
 
-### Требования
+### Requirements
 - Python 3.10+
 - Node.js 18+
 - PostgreSQL 14+
@@ -123,20 +123,20 @@ venv\Scripts\activate     # Windows
 pip install -r requirements.txt
 ```
 
-Создай файл `backend/.env` (по образцу `.env.example`):
+Create a `backend/.env` file (see `.env.example`):
 
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/meetalfred_db
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
-Запуск:
+Run:
 
 ```bash
 uvicorn main:app --reload
 ```
 
-Бэкенд будет доступен на `http://localhost:8000`. Документация API: `http://localhost:8000/docs`.
+The backend will be available at `http://localhost:8000`. API docs: `http://localhost:8000/docs`.
 
 ### Frontend
 
@@ -145,65 +145,65 @@ cd frontend-clean
 npm install
 ```
 
-Создай файл `frontend-clean/.env.local`:
+Create a `frontend-clean/.env.local` file:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_ADMIN_PASSWORD=your_admin_password
 ```
 
-Запуск:
+Run:
 
 ```bash
 npm run dev
 ```
 
-Фронт будет доступен на `http://localhost:3000`.
+The frontend will be available at `http://localhost:3000`.
 
 ---
 
-## Деплой
+## Deployment
 
 ### Backend (Railway)
-1. Создать проект из GitHub репозитория
+1. Create a project from the GitHub repository
 2. Settings → Source → Root Directory: `backend`
-3. Добавить PostgreSQL plugin
+3. Add the PostgreSQL plugin
 4. Variables:
-   - `DATABASE_URL` (автоматически от PostgreSQL plugin)
+   - `DATABASE_URL` (auto-injected by the PostgreSQL plugin)
    - `GEMINI_API_KEY`
 
 ### Frontend (Vercel)
-1. Import Git Repository
+1. Import the Git repository
 2. Root Directory: `frontend-clean`
 3. Environment Variables:
-   - `NEXT_PUBLIC_API_URL` — URL бэкенда на Railway
-   - `NEXT_PUBLIC_ADMIN_PASSWORD` — пароль админа
+   - `NEXT_PUBLIC_API_URL` — backend URL on Railway
+   - `NEXT_PUBLIC_ADMIN_PASSWORD` — admin password
 
 ---
 
-## Аутентификация
+## Authentication
 
-- **Guest** — публичный demo-доступ, все данные анонимизированы
-- **Admin** — полный доступ через пароль из `NEXT_PUBLIC_ADMIN_PASSWORD`
+- **Guest** — public demo access, all data is anonymized
+- **Admin** — full access via the password defined in `NEXT_PUBLIC_ADMIN_PASSWORD`
 
-Логика хранится в `app/lib/AuthContext.tsx`, флаг `DEMO_MODE` в `app/lib/demo.ts` определяет уровень анонимизации.
+The logic lives in `app/lib/AuthContext.tsx`; the `DEMO_MODE` flag in `app/lib/demo.ts` controls the level of anonymization.
 
 ---
 
-## Основные API endpoints
+## Main API endpoints
 
-| Method | Path | Описание |
-|--------|------|----------|
-| GET | `/analytics/profiles-summary` | Сводка по профилям за период |
-| GET | `/analytics/campaigns-summary` | Сводка по кампаниям за период |
-| GET | `/analytics/daily-summary` | Динамика по дням |
-| GET | `/analytics/recent-replies` | Последние ответы |
-| GET | `/analytics/campaign-sequence` | Sequence сообщений в кампании |
-| GET | `/analytics/template-conversions` | Конверсия шаблонов |
-| GET | `/analytics/ai-insights` | AI-инсайт от Gemini |
-| GET | `/crm/leads` | Список лидов с фильтрами |
-| GET | `/crm/leads/{id}` | Карточка лида |
-| GET | `/crm/leads/{id}/activities` | История активности лида |
-| POST | `/sync-all` | Ручной запуск синхронизации |
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/analytics/profiles-summary` | Profile summary for a period |
+| GET | `/analytics/campaigns-summary` | Campaign summary for a period |
+| GET | `/analytics/daily-summary` | Daily trends |
+| GET | `/analytics/recent-replies` | Recent replies |
+| GET | `/analytics/campaign-sequence` | Message sequence in a campaign |
+| GET | `/analytics/template-conversions` | Template conversion rates |
+| GET | `/analytics/ai-insights` | AI insight from Gemini |
+| GET | `/crm/leads` | List of leads with filters |
+| GET | `/crm/leads/{id}` | Lead detail |
+| GET | `/crm/leads/{id}/activities` | Lead activity history |
+| POST | `/sync-all` | Manual sync trigger |
 
-Полная документация Swagger: `/docs` на Railway URL.
+Full Swagger docs: `/docs` on the Railway URL.
