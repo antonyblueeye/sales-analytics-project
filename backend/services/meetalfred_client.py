@@ -8,6 +8,48 @@ from crud import upsert_campaign, upsert_lead, upsert_action   # импорти�
 
 BASE_URL = "https://meetalfred.com/api/integrations/webhook"
 TIMEOUT = 60.0  # Увеличили таймаут до 60 секунд
+EARLY_STOP_DUPLICATE_PAGES = 2  # Stop pagination after N consecutive pages of known records
+
+def _paginate_api(
+    client: httpx.Client,
+    url: str,
+    params_base: dict,
+    result_key: str,
+    on_page,
+    page_start: int = 0,
+    per_page: int = 100,
+) -> int:
+    """
+    Paginate MeetAlfred API. on_page(batch) -> bool (all_records_already_known).
+    Stops early after EARLY_STOP_DUPLICATE_PAGES consecutive all-known pages.
+    """
+    current_page = page_start
+    total_fetched = 0
+    consecutive_known_pages = 0
+
+    while True:
+        params = {**params_base, "page": current_page, "per_page": per_page}
+        response = client.get(url, params=params)
+        response.raise_for_status()
+        batch = response.json().get(result_key, [])
+        if not batch:
+            break
+
+        total_fetched += len(batch)
+        all_known = on_page(batch)
+        if all_known:
+            consecutive_known_pages += 1
+            if consecutive_known_pages >= EARLY_STOP_DUPLICATE_PAGES:
+                print(f"[MeetAlfred] Early stop at page {current_page} ({result_key}: all known)")
+                break
+        else:
+            consecutive_known_pages = 0
+
+        if len(batch) < per_page:
+            break
+        current_page += 1
+
+    return total_fetched
 
 def make_action_external_id(lead_urn, campaign_key, created_at, desc, msg):
     # Объединяем все поля в одну строку через разделитель, например "|"
@@ -153,49 +195,66 @@ def sync_leads(db: Session, profile_id: int, api_key: str) -> dict:
     profile_id нужен, только чтобы знать, для какого профиля делаем запрос,
     но в таблицу leads он не записывается (справочник общий).
     """
-    actions = fetch_new_leads(api_key)
     processed = 0
+    total_fetched = 0
 
-    for action in actions:
-        person = action.get("person", {})
-        external_id = person.get("key")
-        if not external_id:
-            continue   # без ключа лида не можем сохранить
+    def process_page(actions: List[Dict[str, Any]]) -> bool:
+        nonlocal processed
+        page_had_new = False
+        for action in actions:
+            person = action.get("person", {})
+            external_id = person.get("key")
+            if not external_id:
+                continue
 
-        # Извлекаем данные из person
-        first_name = person.get("first_name", "")
-        last_name = person.get("last_name", "")
-        email = person.get("email")
-        work_email = person.get("work_email")
-        linkedin_handle = person.get("linkedin_handle")
-        linkedin_url = make_linkedin_url(linkedin_handle) if linkedin_handle else None
-        photo_url = person.get("linkedin_data", {}).get("pic") if person.get("linkedin_data") else None
-        current_employer = person.get("current_employer")
-        current_title = person.get("current_title")
-        location = person.get("location")
-        twitter_handle = person.get("twitter_handle")
-        object_urn = person.get("object_urn") or person.get("linkedin_data", {}).get("objectUrn")
+            existing = db.query(Lead).filter(Lead.external_id == external_id).first()
+            if not existing:
+                page_had_new = True
 
-        # Сохраняем/обновляем лида
-        upsert_lead(
-            db,
-            external_id=external_id,
-            object_urn=object_urn,
-            first_name=first_name,
-            last_name=last_name,
-            email=email,
-            work_email=work_email,
-            linkedin_handle=linkedin_handle,
-            linkedin_url=linkedin_url,
-            photo_url=photo_url,
-            current_employer=current_employer,
-            current_title=current_title,
-            location=location,
-            twitter_handle=twitter_handle,
+            first_name = person.get("first_name", "")
+            last_name = person.get("last_name", "")
+            email = person.get("email")
+            work_email = person.get("work_email")
+            linkedin_handle = person.get("linkedin_handle")
+            linkedin_url = make_linkedin_url(linkedin_handle) if linkedin_handle else None
+            photo_url = person.get("linkedin_data", {}).get("pic") if person.get("linkedin_data") else None
+            current_employer = person.get("current_employer")
+            current_title = person.get("current_title")
+            location = person.get("location")
+            twitter_handle = person.get("twitter_handle")
+            object_urn = person.get("object_urn") or person.get("linkedin_data", {}).get("objectUrn")
+
+            upsert_lead(
+                db,
+                external_id=external_id,
+                object_urn=object_urn,
+                first_name=first_name,
+                last_name=last_name,
+                email=email,
+                work_email=work_email,
+                linkedin_handle=linkedin_handle,
+                linkedin_url=linkedin_url,
+                photo_url=photo_url,
+                current_employer=current_employer,
+                current_title=current_title,
+                location=location,
+                twitter_handle=twitter_handle,
+            )
+            processed += 1
+        return not page_had_new
+
+    with httpx.Client(timeout=TIMEOUT) as client:
+        total_fetched = _paginate_api(
+            client,
+            f"{BASE_URL}/new-leads",
+            {"webhook_key": api_key},
+            "actions",
+            process_page,
+            page_start=0,
         )
-        processed += 1
 
-    return {"leads_processed": processed}
+    print(f"[MeetAlfred] Получено действий (лидов): {total_fetched}, обработано: {processed}")
+    return {"leads_processed": processed, "pages_fetched": total_fetched}
 
 def sync_actions(db: Session, profile_id: int, api_key: str) -> dict:
     """
@@ -222,95 +281,101 @@ def sync_actions(db: Session, profile_id: int, api_key: str) -> dict:
     }
 
     for api_action_type, our_action_type in action_types_mapping.items():
-        actions_data = fetch_actions(api_key, api_action_type)
-        stats["total_actions_fetched"] += len(actions_data)
+        def process_page(actions_data: List[Dict[str, Any]], _api_type=api_action_type, _our_type=our_action_type) -> bool:
+            page_new = 0
+            page_dup = 0
+            for act in actions_data:
+                lead_urn = (
+                    act.get("lead", {}).get("object_urn") or
+                    act.get("lead", {}).get("person", {}).get("object_urn")
+                )
+                if not lead_urn:
+                    stats["no_lead_urn"] += 1
+                    continue
 
-        for act in actions_data:
-            # 1. Получаем object_urn лида
-            lead_urn = (
-                act.get("lead", {}).get("object_urn") or
-                act.get("lead", {}).get("person", {}).get("object_urn")
+                person = act.get("lead", {}).get("person", {})
+                lead_external_id = person.get("key")
+                lead_data = {
+                    "first_name": person.get("first_name", ""),
+                    "last_name": person.get("last_name", ""),
+                    "email": person.get("email"),
+                    "work_email": person.get("work_email"),
+                    "linkedin_handle": person.get("linkedin_handle"),
+                    "linkedin_url": make_linkedin_url(person.get("linkedin_handle")) if person.get("linkedin_handle") else None,
+                    "photo_url": person.get("linkedin_data", {}).get("pic") if person.get("linkedin_data") else None,
+                    "current_employer": person.get("current_employer"),
+                    "current_title": person.get("current_title"),
+                    "location": person.get("location"),
+                    "twitter_handle": person.get("twitter_handle"),
+                }
+                lead_data = {k: v for k, v in lead_data.items() if v is not None}
+
+                lead = upsert_lead(
+                    db,
+                    external_id=lead_external_id,
+                    object_urn=lead_urn,
+                    **lead_data
+                )
+                stats["lead_upsert_called"] += 1
+
+                campaign_key = act.get("lead", {}).get("campaign", {}).get("key")
+                if not campaign_key:
+                    stats["no_campaign_key"] += 1
+                    continue
+
+                campaign = db.query(Campaign).filter(
+                    Campaign.profile_id == profile_id,
+                    Campaign.external_id == str(campaign_key)
+                ).first()
+                if not campaign:
+                    stats["campaign_not_in_db"] += 1
+                    continue
+
+                created_at = act.get("created_at")
+                if not created_at:
+                    stats["no_created_at"] += 1
+                    continue
+                performed_at = parse_meetalfred_date(created_at)
+                if not performed_at:
+                    stats["invalid_date"] += 1
+                    continue
+
+                desc = act.get("desc", "")
+                msg = act.get("msg", "") or ""
+                action_ext_id = make_action_external_id(lead_urn, campaign_key, created_at, desc, msg)
+
+                existing = db.query(Action).filter(Action.external_id == action_ext_id).first()
+                if existing:
+                    stats["duplicate_external_id"] += 1
+                    page_dup += 1
+                    continue
+
+                upsert_action(
+                    db,
+                    external_id=action_ext_id,
+                    action_type=_our_type,
+                    message=msg,
+                    performed_at=performed_at,
+                    lead_id=lead.id,
+                    campaign_id=campaign.id,
+                    profile_id=profile_id
+                )
+                stats["success"] += 1
+                page_new += 1
+
+            return page_new == 0 and page_dup > 0
+
+        with httpx.Client(timeout=TIMEOUT) as client:
+            fetched = _paginate_api(
+                client,
+                f"{BASE_URL}/get-last-actions",
+                {"webhook_key": api_key, "action": api_action_type},
+                "actions",
+                process_page,
+                page_start=0,
             )
-            if not lead_urn:
-                stats["no_lead_urn"] += 1
-                continue
-
-            # 2. Извлекаем данные лида из поля person (если есть)
-            person = act.get("lead", {}).get("person", {})
-            lead_external_id = person.get("key")  # может быть None
-            lead_data = {
-                "first_name": person.get("first_name", ""),
-                "last_name": person.get("last_name", ""),
-                "email": person.get("email"),
-                "work_email": person.get("work_email"),
-                "linkedin_handle": person.get("linkedin_handle"),
-                "linkedin_url": make_linkedin_url(person.get("linkedin_handle")) if person.get("linkedin_handle") else None,
-                "photo_url": person.get("linkedin_data", {}).get("pic") if person.get("linkedin_data") else None,
-                "current_employer": person.get("current_employer"),
-                "current_title": person.get("current_title"),
-                "location": person.get("location"),
-                "twitter_handle": person.get("twitter_handle"),
-            }
-            # Убираем поля со значением None (чтобы не перезаписывать существующие данные)
-            lead_data = {k: v for k, v in lead_data.items() if v is not None}
-
-            # 3. Создаём или обновляем лида
-            lead = upsert_lead(
-                db,
-                external_id=lead_external_id,
-                object_urn=lead_urn,
-                **lead_data
-            )
-            stats["lead_upsert_called"] += 1
-
-            # 4. Получаем campaign key
-            campaign_key = act.get("lead", {}).get("campaign", {}).get("key")
-            if not campaign_key:
-                stats["no_campaign_key"] += 1
-                continue
-
-            # 5. Ищем кампанию в БД
-            campaign = db.query(Campaign).filter(
-                Campaign.profile_id == profile_id,
-                Campaign.external_id == str(campaign_key)
-            ).first()
-            if not campaign:
-                stats["campaign_not_in_db"] += 1
-                continue
-
-            # 6. Дата
-            created_at = act.get("created_at")
-            if not created_at:
-                stats["no_created_at"] += 1
-                continue
-            performed_at = parse_meetalfred_date(created_at)
-            if not performed_at:
-                stats["invalid_date"] += 1
-                continue
-
-            # 7. external_id для действия (хеш)
-            desc = act.get("desc", "")
-            msg = act.get("msg", "") or ""
-            action_ext_id = make_action_external_id(lead_urn, campaign_key, created_at, desc, msg)
-
-            # 8. Проверяем дубликат действия
-            existing = db.query(Action).filter(Action.external_id == action_ext_id).first()
-            if existing:
-                stats["duplicate_external_id"] += 1
-                continue
-
-            # 9. Сохраняем действие
-            upsert_action(
-                db,
-                external_id=action_ext_id,
-                action_type=our_action_type,
-                message=msg,
-                performed_at=performed_at,
-                lead_id=lead.id,
-                campaign_id=campaign.id,
-                profile_id=profile_id
-            )
-            stats["success"] += 1
+        stats["total_actions_fetched"] += fetched
+        print(f"[MeetAlfred] Получено действий типа {api_action_type}: {fetched}")
 
     print("\n===== СТАТИСТИКА СИНХРОНИЗАЦИИ ДЕЙСТВИЙ =====")
     for key, value in stats.items():

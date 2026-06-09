@@ -12,6 +12,13 @@ from typing import Optional, Any, Dict
 from fastapi import HTTPException
 from models import Campaign, Profile, Action
 
+MAX_MESSAGE_PREVIEW = 500
+
+def _truncate_message(text: str, max_len: int = MAX_MESSAGE_PREVIEW) -> str:
+    if not text or len(text) <= max_len:
+        return text or ""
+    return text[:max_len] + "…"
+
 def get_leads_list(
     db: Session, 
     page: int = 1, 
@@ -27,7 +34,8 @@ def get_leads_list(
     activity_date_from: Optional[str] = None,
     activity_date_to: Optional[str] = None,
     campaign: Optional[str] = None,
-    status: Optional[str] = None
+    status: Optional[str] = None,
+    include_messages: bool = False,
 ):
     offset = (page - 1) * limit
     
@@ -149,36 +157,41 @@ def get_leads_list(
     if not leads_list:
         return {"leads": [], "total": 0, "page": page, "limit": limit}
 
-    lead_ids = [l['id'] for l in leads_list]
-    
-    # FETCH MESSAGES for these leads to populate the Correspondence drawer
-    msg_query = text("""
-        SELECT a.lead_id, a.message, a.action_type, a.performed_at, p.name as profile_name
-        FROM actions a
-        LEFT JOIN profiles p ON a.profile_id = p.id
-        WHERE a.lead_id IN :lead_ids AND a.message <> ''
-        ORDER BY a.performed_at ASC
-    """)
-    msg_res = db.execute(msg_query, {"lead_ids": tuple(lead_ids)})
-    
-    # Map messages to leads
-    messages_by_lead = {}
-    for row in msg_res:
-        r = row._mapping
-        lid = r['lead_id']
-        if lid not in messages_by_lead:
-            messages_by_lead[lid] = []
-        messages_by_lead[lid].append({
-            "role": "lead" if r['action_type'] == 'replied' else "me",
-            "text": r['message'],
-            "profile_name": r['profile_name'] or 'Unknown',
-            "timestamp": r['performed_at'].strftime('%H:%M %d.%m.%Y') if r['performed_at'] else ''
-        })
+    if include_messages:
+        lead_ids = [l['id'] for l in leads_list]
+        
+        # FETCH MESSAGES for these leads to populate the Correspondence drawer
+        msg_query = text("""
+            SELECT a.lead_id, a.message, a.action_type, a.performed_at, p.name as profile_name
+            FROM actions a
+            LEFT JOIN profiles p ON a.profile_id = p.id
+            WHERE a.lead_id IN :lead_ids AND a.message <> ''
+            ORDER BY a.performed_at ASC
+        """)
+        msg_res = db.execute(msg_query, {"lead_ids": tuple(lead_ids)})
+        
+        # Map messages to leads
+        messages_by_lead = {}
+        for row in msg_res:
+            r = row._mapping
+            lid = r['lead_id']
+            if lid not in messages_by_lead:
+                messages_by_lead[lid] = []
+            messages_by_lead[lid].append({
+                "role": "lead" if r['action_type'] == 'replied' else "me",
+                "text": _truncate_message(r['message']),
+                "profile_name": r['profile_name'] or 'Unknown',
+                "timestamp": r['performed_at'].strftime('%H:%M %d.%m.%Y') if r['performed_at'] else ''
+            })
 
-    # Attach messages to lead objects
+        # Attach messages to lead objects
+        for lead in leads_list:
+            lead['messages'] = messages_by_lead.get(lead['id'], [])
+    
+    # Ensure arrays are lists (PostgreSQL returns them as Python lists already)
     for lead in leads_list:
-        lead['messages'] = messages_by_lead.get(lead['id'], [])
-        # Ensure arrays are lists (PostgreSQL returns them as Python lists already)
+        if not include_messages:
+            lead['messages'] = []
         lead['campaign_names'] = lead.get('campaign_names') or []
         lead['profile_names'] = lead.get('profile_names') or []
     
@@ -204,7 +217,8 @@ def get_replied_leads(
     activity_date_from: Optional[str] = None,
     activity_date_to: Optional[str] = None,
     campaign: Optional[str] = None,
-    status: Optional[str] = None
+    status: Optional[str] = None,
+    include_messages: bool = False,
 ):
     offset = (page - 1) * limit
     
@@ -292,50 +306,107 @@ def get_replied_leads(
         
     lead_ids = [row['lead_id'] for row in lead_data_list]
     
-    # Fetch detailed info, ALL messages, and all campaigns/profiles for these leads
-    detailed_query = text("""
-        WITH lead_metadata AS (
-            SELECT a.lead_id,
-                   array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
-                   array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
-            FROM actions a
+    if include_messages:
+        # Fetch detailed info, ALL messages, and all campaigns/profiles for these leads
+        detailed_query = text("""
+            WITH lead_metadata AS (
+                SELECT a.lead_id,
+                       array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
+                       array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
+                FROM actions a
+                LEFT JOIN campaigns c ON a.campaign_id = c.id
+                LEFT JOIN profiles p ON a.profile_id = p.id
+                WHERE a.lead_id IN :lead_ids
+                GROUP BY a.lead_id
+            )
+            SELECT
+                l.id as lead_id,
+                coalesce(l.first_name, '') as first_name,
+                coalesce(l.last_name, '') as last_name,
+                coalesce(CASE WHEN l.work_email LIKE '%@%' THEN l.work_email ELSE '' END, '') as email,
+                coalesce(l.linkedin_url, '') as linkedin_url,
+                coalesce(l.photo_url, '') as photo_url,
+                coalesce(l.current_employer, '') as company_name,
+                coalesce(l.current_title, '') as title,
+                coalesce(l.location, '') as location,
+                m.campaign_names,
+                m.profile_names,
+                a.message,
+                a.action_type,
+                a.performed_at,
+                p.name as profile_name
+            FROM leads l
+            JOIN actions a ON l.id = a.lead_id
+            LEFT JOIN profiles p ON a.profile_id = p.id
+            LEFT JOIN lead_metadata m ON l.id = m.lead_id
+            WHERE l.id IN :lead_ids AND a.message <> ''
+            ORDER BY a.performed_at ASC
+        """)
+        
+        result = db.execute(detailed_query, {"lead_ids": tuple(lead_ids)})
+        
+        # Group by lead
+        leads_dict = {}
+        for row in result:
+            r = row._mapping
+            lid = r['lead_id']
+            if lid not in leads_dict:
+                last_reply = next(item['last_reply_at'] for item in lead_data_list if item['lead_id'] == lid)
+                first_action = next(item['first_action_at'] for item in lead_data_list if item['lead_id'] == lid)
+                leads_dict[lid] = {
+                    "id": lid,
+                    "first_name": r['first_name'],
+                    "last_name": r['last_name'],
+                    "email": r['email'],
+                    "linkedin_url": r['linkedin_url'],
+                    "photo_url": r['photo_url'],
+                    "company_name": r['company_name'],
+                    "title": r['title'],
+                    "location": r['location'],
+                    "status": "Engaged",
+                    "campaign_names": list(r['campaign_names']) if r['campaign_names'] else [],
+                    "profile_names": list(r['profile_names']) if r['profile_names'] else [],
+                    "last_reply_at": last_reply.isoformat() if last_reply else None,
+                    "created_at": first_action.isoformat() if first_action else None,
+                    "messages": []
+                }
+            
+            leads_dict[lid]["messages"].append({
+                "role": "lead" if r['action_type'] == 'replied' else "me",
+                "text": _truncate_message(r['message']),
+                "profile_name": r['profile_name'] or 'Unknown',
+                "timestamp": r['performed_at'].strftime('%H:%M %d.%m.%Y') if r['performed_at'] else ''
+            })
+        
+        final_leads = list(leads_dict.values())
+    else:
+        # Lightweight list: lead metadata only, no message bodies
+        summary_query = text("""
+            SELECT
+                l.id as lead_id,
+                coalesce(l.first_name, '') as first_name,
+                coalesce(l.last_name, '') as last_name,
+                coalesce(CASE WHEN l.work_email LIKE '%@%' THEN l.work_email ELSE '' END, '') as email,
+                coalesce(l.linkedin_url, '') as linkedin_url,
+                coalesce(l.photo_url, '') as photo_url,
+                coalesce(l.current_employer, '') as company_name,
+                coalesce(l.current_title, '') as title,
+                coalesce(l.location, '') as location,
+                array_agg(DISTINCT c.name) FILTER (WHERE c.name IS NOT NULL) as campaign_names,
+                array_agg(DISTINCT p.name) FILTER (WHERE p.name IS NOT NULL) as profile_names
+            FROM leads l
+            JOIN actions a ON l.id = a.lead_id
             LEFT JOIN campaigns c ON a.campaign_id = c.id
             LEFT JOIN profiles p ON a.profile_id = p.id
-            WHERE a.lead_id IN :lead_ids
-            GROUP BY a.lead_id
-        )
-        SELECT
-            l.id as lead_id,
-            coalesce(l.first_name, '') as first_name,
-            coalesce(l.last_name, '') as last_name,
-            coalesce(CASE WHEN l.work_email LIKE '%@%' THEN l.work_email ELSE '' END, '') as email,
-            coalesce(l.linkedin_url, '') as linkedin_url,
-            coalesce(l.photo_url, '') as photo_url,
-            coalesce(l.current_employer, '') as company_name,
-            coalesce(l.current_title, '') as title,
-            coalesce(l.location, '') as location,
-            m.campaign_names,
-            m.profile_names,
-            a.message,
-            a.action_type,
-            a.performed_at,
-            p.name as profile_name
-        FROM leads l
-        JOIN actions a ON l.id = a.lead_id
-        LEFT JOIN profiles p ON a.profile_id = p.id
-        LEFT JOIN lead_metadata m ON l.id = m.lead_id
-        WHERE l.id IN :lead_ids AND a.message <> ''
-        ORDER BY a.performed_at ASC
-    """)
-    
-    result = db.execute(detailed_query, {"lead_ids": tuple(lead_ids)})
-    
-    # Group by lead
-    leads_dict = {}
-    for row in result:
-        r = row._mapping
-        lid = r['lead_id']
-        if lid not in leads_dict:
+            WHERE l.id IN :lead_ids
+            GROUP BY l.id, l.first_name, l.last_name, l.work_email, l.linkedin_url, l.photo_url,
+                     l.current_employer, l.current_title, l.location
+        """)
+        result = db.execute(summary_query, {"lead_ids": tuple(lead_ids)})
+        leads_dict = {}
+        for row in result:
+            r = row._mapping
+            lid = r['lead_id']
             last_reply = next(item['last_reply_at'] for item in lead_data_list if item['lead_id'] == lid)
             first_action = next(item['first_action_at'] for item in lead_data_list if item['lead_id'] == lid)
             leads_dict[lid] = {
@@ -353,18 +424,11 @@ def get_replied_leads(
                 "profile_names": list(r['profile_names']) if r['profile_names'] else [],
                 "last_reply_at": last_reply.isoformat() if last_reply else None,
                 "created_at": first_action.isoformat() if first_action else None,
-                "messages": []
+                "messages": [],
             }
-        
-        leads_dict[lid]["messages"].append({
-            "role": "lead" if r['action_type'] == 'replied' else "me",
-            "text": r['message'],
-            "profile_name": r['profile_name'] or 'Unknown',
-            "timestamp": r['performed_at'].strftime('%H:%M %d.%m.%Y') if r['performed_at'] else ''
-        })
+        final_leads = list(leads_dict.values())
     
     # Sort by last_reply_at descending
-    final_leads = list(leads_dict.values())
     final_leads.sort(key=lambda x: x['last_reply_at'] or '', reverse=True)
     
     return {
@@ -399,7 +463,7 @@ def get_lead_activities(db: Session, lead_id: int):
         activities.append({
             "id": r["id"],
             "type": r["action_type"],
-            "message": r["message"] or "",
+            "message": _truncate_message(r["message"] or ""),
             "date": r["performed_at"].isoformat() if r["performed_at"] else None,
             "campaign": r["campaign_name"],
             "profile": r["profile_name"],
@@ -469,7 +533,7 @@ def get_lead_by_id(db: Session, lead_id: int):
         rm = r._mapping
         msgs.append({
             "role": "lead" if rm['action_type'] == 'replied' else "me",
-            "text": rm['message'],
+            "text": _truncate_message(rm['message']),
             "profile_name": rm['profile_name'] or 'Unknown',
             "timestamp": rm['performed_at'].strftime('%H:%M %d.%m.%Y') if rm['performed_at'] else ''
         })

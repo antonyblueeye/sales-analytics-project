@@ -4,6 +4,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text, and_, func
 from sqlalchemy.orm import Session, Mapped, mapped_column
 from database import engine, get_db
@@ -17,6 +18,15 @@ from crm import get_leads_list, get_replied_leads, get_lead_activities, get_lead
 
 app = FastAPI()
 
+MAX_PAGE_LIMIT = 100
+MAX_ACTIONS_LIMIT = 500
+
+def _clamp_limit(limit: int, default: int = 20, maximum: int = MAX_PAGE_LIMIT) -> int:
+    if limit < 1:
+        return default
+    return min(limit, maximum)
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -90,7 +100,7 @@ def sync_actions_endpoint(
 
 @app.get("/actions")
 def get_actions(
-    limit: int = 100,
+    limit: int = Query(100, ge=1, le=MAX_ACTIONS_LIMIT),
     db: Session = Depends(get_db)
 ):
     actions = db.query(Action).order_by(Action.performed_at.desc()).limit(limit).all()
@@ -104,7 +114,7 @@ def get_campaigns(db: Session = Depends(get_db)):
 @app.get("/profiles")
 def get_profiles(db: Session = Depends(get_db)):
     profiles = db.query(Profile).all()
-    return profiles
+    return [{"id": p.id, "name": p.name} for p in profiles]
 
 # Нужно запомнить, что пост запросы вызываются только через /docs, а не прописываются в 
 # браузерной строке
@@ -182,6 +192,7 @@ def campaigns_summary(
 def crm_leads(
     page: int = 1,
     limit: int = 20,
+    include_messages: bool = False,
     search: Optional[str] = None,
     first_name: Optional[str] = None,
     last_name: Optional[str] = None,
@@ -197,12 +208,13 @@ def crm_leads(
     db: Session = Depends(get_db)
 ):
     data = get_leads_list(
-        db, page, limit, search,
+        db, page, _clamp_limit(limit), search,
         first_name, last_name, company,
         location, title,
         create_date_from, create_date_to,
         activity_date_from, activity_date_to,
-        campaign, status
+        campaign, status,
+        include_messages=include_messages,
     )
     return data
 
@@ -210,6 +222,7 @@ def crm_leads(
 def crm_replied_leads(
     page: int = 1,
     limit: int = 20,
+    include_messages: bool = False,
     search: Optional[str] = None,
     first_name: Optional[str] = None,
     last_name: Optional[str] = None,
@@ -225,17 +238,22 @@ def crm_replied_leads(
     db: Session = Depends(get_db)
 ):
     data = get_replied_leads(
-        db, page, limit, search,
+        db, page, _clamp_limit(limit), search,
         first_name, last_name, company,
         location, title,
         create_date_from, create_date_to,
         activity_date_from, activity_date_to,
-        campaign, status
+        campaign, status,
+        include_messages=include_messages,
     )
     return data
 
 @app.get("/crm/leads/search")
-def crm_search_leads(q: str = "", limit: int = 5, db: Session = Depends(get_db)):
+def crm_search_leads(
+    q: str = "",
+    limit: int = Query(5, ge=1, le=50),
+    db: Session = Depends(get_db),
+):
     if not q or len(q.strip()) < 2:
         return []
     return search_leads(db, q.strip(), limit)
@@ -299,7 +317,9 @@ def create_lead(
 
 @app.get("/analytics/campaigns-list")
 def campaigns_list(db: Session = Depends(get_db)):
-    return get_campaigns_list(db)
+    from fastapi.responses import JSONResponse
+    data = get_campaigns_list(db)
+    return JSONResponse(content=data, headers={"Cache-Control": "public, max-age=300"})
 
 @app.get("/analytics/campaign-history")
 def campaign_history(

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useRef, useEffect, useMemo, MouseEvent as ReactMouseEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { DayPicker, DateRange } from 'react-day-picker';
 import { format, parseISO } from 'date-fns';
@@ -675,58 +675,47 @@ export default function CRMPage() {
         }
     };
 
-    // Effect for handling tab changes
-    useEffect(() => {
-        setCurrentPage(1);
-        fetchLeads(1, {
-            search,
-            firstName: filterFirstName,
-            lastName: filterLastName,
-            company: filterCompany,
-            location: filterLocation,
-            position: filterPosition,
-            createDateRange: filterCreateDate,
-            activityDateRange: filterActivityDate,
-            campaign: filterCampaign,
-            status: filterStatus
-        });
-    }, [activeTab]);
+    const filterParams = useMemo(() => ({
+        search,
+        firstName: filterFirstName,
+        lastName: filterLastName,
+        company: filterCompany,
+        location: filterLocation,
+        position: filterPosition,
+        createDateRange: filterCreateDate,
+        activityDateRange: filterActivityDate,
+        campaign: filterCampaign,
+        status: filterStatus,
+    }), [search, filterFirstName, filterLastName, filterCompany, filterLocation, filterPosition, filterCreateDate, filterActivityDate, filterCampaign, filterStatus]);
 
-    // Debounce effect for filters
-    useEffect(() => {
-        const handler = setTimeout(() => {
-            setCurrentPage(1); // Reset to first page on filter change
-            fetchLeads(1, {
-                search,
-                firstName: filterFirstName,
-                lastName: filterLastName,
-                company: filterCompany,
-                location: filterLocation,
-                position: filterPosition,
-                createDateRange: filterCreateDate,
-                activityDateRange: filterActivityDate,
-                campaign: filterCampaign,
-                status: filterStatus
-            });
-        }, 500); // 500ms debounce
+    const [debouncedFilterParams, setDebouncedFilterParams] = useState(filterParams);
+    const skipPaginationRef = useRef(false);
+    const isFirstFilterSync = useRef(true);
 
+    useEffect(() => {
+        if (isFirstFilterSync.current) {
+            isFirstFilterSync.current = false;
+            return;
+        }
+        const handler = setTimeout(() => setDebouncedFilterParams(filterParams), 500);
         return () => clearTimeout(handler);
-    }, [search, filterFirstName, filterLastName, filterCompany, filterLocation, filterPosition, filterCreateDate, filterActivityDate, filterCampaign, filterStatus]);
+    }, [filterParams]);
 
-    // Handle pagination specifically
+    // Filters or tab changed — always fetch page 1
     useEffect(() => {
-        fetchLeads(currentPage, {
-            search,
-            firstName: filterFirstName,
-            lastName: filterLastName,
-            company: filterCompany,
-            location: filterLocation,
-            position: filterPosition,
-            createDateRange: filterCreateDate,
-            activityDateRange: filterActivityDate,
-            campaign: filterCampaign,
-            status: filterStatus
-        });
+        fetchLeads(1, debouncedFilterParams);
+        setCurrentPage(1);
+        skipPaginationRef.current = true;
+    }, [debouncedFilterParams, activeTab]);
+
+    // Pagination only
+    useEffect(() => {
+        if (skipPaginationRef.current) {
+            skipPaginationRef.current = false;
+            return;
+        }
+        if (currentPage === 1) return;
+        fetchLeads(currentPage, debouncedFilterParams);
     }, [currentPage]);
 
     useEffect(() => {
@@ -911,10 +900,10 @@ export default function CRMPage() {
             setActiveLead(lead);
             setSelectedLead(lead);
 
-            // Set default profile filter to the first profile that has messages
-            const profilesWithMessages = Array.from(new Set(lead.messages?.map(m => m.profile_name))).filter(Boolean);
-            if (profilesWithMessages.length > 0) {
-                setMessageProfileFilter(profilesWithMessages[0]!);
+            // Set default profile filter from lead profiles (messages loaded on demand)
+            const profiles = lead.profileNames.filter(Boolean);
+            if (profiles.length > 0) {
+                setMessageProfileFilter(profiles[0]!);
             } else {
                 setMessageProfileFilter('');
             }

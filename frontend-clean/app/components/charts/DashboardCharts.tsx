@@ -346,7 +346,7 @@ const RecentRepliesBubbles = ({ replies }: { replies: any[] }) => {
       return;
     }
 
-    const processedBubbles = replies.slice(0, 200).map((reply, i) => ({
+    const processedBubbles = replies.slice(0, 50).map((reply, i) => ({
       ...reply,
       id: i,
     }));

@@ -18,6 +18,20 @@ from typing import Optional, Any
 _analytics_cache = {}
 CACHE_TTL = 300  # 5 minutes in seconds
 
+def _cache_get(key: str):
+    entry = _analytics_cache.get(key)
+    if entry and (time.time() - entry["timestamp"] < CACHE_TTL):
+        return entry["data"]
+    return None
+
+def _cache_set(key: str, data):
+    _analytics_cache[key] = {"data": data, "timestamp": time.time()}
+
+def _truncate_message(text: str, max_len: int = 500) -> str:
+    if not text or len(text) <= max_len:
+        return text or ""
+    return text[:max_len] + "…"
+
 def get_total_actions(db: Session, from_date: Optional[datetime] = None, to_date: Optional[datetime] = None) -> int:
     query = db.query(Action)
     if from_date:
@@ -142,6 +156,9 @@ def get_campaigns_summary(db: Session, from_date: date, to_date: date):
     ]
 
 def get_campaigns_list(db: Session):
+    cached = _cache_get("campaigns_list")
+    if cached is not None:
+        return cached
     sql = text("""
         SELECT DISTINCT trim(regexp_replace(name, '\\s*(\\[[^\\]]*\\]|\\([^\\)]*\\))', '', 'g')) AS clean_campaign
         FROM campaigns
@@ -149,7 +166,9 @@ def get_campaigns_list(db: Session):
         ORDER BY clean_campaign
     """)
     result = db.execute(sql)
-    return [row.clean_campaign for row in result if row.clean_campaign]
+    data = [row.clean_campaign for row in result if row.clean_campaign]
+    _cache_set("campaigns_list", data)
+    return data
 
 def get_campaign_history(db: Session, campaign_name: str, granularity: str):
     if granularity not in ['day', 'week', 'month']:
@@ -222,7 +241,7 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
         .filter(func.date(Action.performed_at) >= from_date)\
         .filter(func.date(Action.performed_at) <= to_date)\
         .order_by(Action.performed_at.desc())\
-        .limit(200).all()
+        .limit(50).all()
     
     def clean_name(name):
         if not name: return "N/A"
@@ -235,7 +254,7 @@ def get_recent_replies(db: Session, from_date: date, to_date: date):
             "last_name": row.Lead.last_name,
             "photo_url": row.Lead.photo_url,
             "linkedin_url": row.Lead.linkedin_url,
-            "message": row.Action.message or "",
+            "message": _truncate_message(row.Action.message or "", 500),
             "performed_at": row.Action.performed_at.isoformat(),
             "campaign_name": clean_name(row.Campaign.name if row.Campaign else None),
             "profile_name": (row.Profile.name if row.Profile else "Unknown")
@@ -618,6 +637,10 @@ def get_replied_titles_analytics(db: Session, campaign_name: str = "all"):
 def get_funnel_history(db: Session, granularity: str = 'day'):
     if granularity not in ['day', 'week', 'month']:
         granularity = 'day'
+    cache_key = f"funnel_history:{granularity}"
+    cached = _cache_get(cache_key)
+    if cached is not None:
+        return cached
     sql = text(f"""
         SELECT
             date_trunc('{granularity}', a.performed_at) AS period,
@@ -632,7 +655,7 @@ def get_funnel_history(db: Session, granularity: str = 'day'):
         ORDER BY period
     """)
     result = db.execute(sql)
-    return [
+    data = [
         {
             "period": row.period.isoformat(),
             "interested": row.interested,
@@ -644,6 +667,8 @@ def get_funnel_history(db: Session, granularity: str = 'day'):
         }
         for row in result
     ]
+    _cache_set(cache_key, data)
+    return data
 
 def get_locations_analytics(db: Session, campaign_name: str = "all"):
     import re

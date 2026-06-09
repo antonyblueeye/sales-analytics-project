@@ -1,9 +1,13 @@
+import os
 from apscheduler.schedulers.background import BackgroundScheduler
 from database import SessionLocal
 from services.meetalfred_client import sync_all_profiles_data
 from services.template_service import process_campaign_templates
 from backup_db import backup_database
 import logging
+
+SYNC_INTERVAL_MINUTES = int(os.getenv("SYNC_INTERVAL_MINUTES", "360"))
+ENABLE_SCHEDULED_BACKUP = os.getenv("ENABLE_SCHEDULED_BACKUP", "false").lower() in ("1", "true", "yes")
 
 def job_sync_all():
     print("[Scheduler] Запуск синхронизации всех профилей...")
@@ -17,9 +21,12 @@ def job_sync_all():
         template_result = process_campaign_templates(db)
         print(f"[Scheduler] Обработка шаблонов завершена: {template_result} новых связей.")
         
-        # 3. Резервное копирование базы
-        print("[Scheduler] Запуск планового бэкапа базы...")
-        backup_database()
+        # 3. Резервное копирование базы (отключено на Railway по умолчанию)
+        if ENABLE_SCHEDULED_BACKUP:
+            print("[Scheduler] Запуск планового бэкапа базы...")
+            backup_database()
+        else:
+            print("[Scheduler] Плановый бэкап пропущен (ENABLE_SCHEDULED_BACKUP=false)")
         
     except Exception as e:
         print(f"[Scheduler] Ошибка: {e}")
@@ -28,7 +35,6 @@ def job_sync_all():
 
 def start_scheduler():
     scheduler = BackgroundScheduler()
-    # Запускать задачу каждые 60 минут
-    scheduler.add_job(job_sync_all, 'interval', minutes=60)
+    scheduler.add_job(job_sync_all, 'interval', minutes=SYNC_INTERVAL_MINUTES)
     scheduler.start()
-    print("[Scheduler] Планировщик запущен, синхронизация и разбор шаблонов будут выполняться каждый час.")
+    print(f"[Scheduler] Планировщик запущен, синхронизация каждые {SYNC_INTERVAL_MINUTES} мин.")
