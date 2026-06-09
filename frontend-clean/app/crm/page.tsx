@@ -904,8 +904,10 @@ export default function CRMPage() {
             const profiles = lead.profileNames.filter(Boolean);
             if (profiles.length > 0) {
                 setMessageProfileFilter(profiles[0]!);
+                setSelectedActivityProfile(profiles[0]!);
             } else {
                 setMessageProfileFilter('');
+                setSelectedActivityProfile('');
             }
 
             // Set default campaign
@@ -914,13 +916,6 @@ export default function CRMPage() {
                 setSelectedCampaign(campaigns[0]);
             } else {
                 setSelectedCampaign('');
-            }
-
-            const profiles = lead.profileNames.filter(Boolean);
-            if (profiles.length > 0) {
-                setSelectedActivityProfile(profiles[0]);
-            } else {
-                setSelectedActivityProfile('');
             }
 
             setTimeout(() => {
