@@ -77,7 +77,7 @@ sales_project/
 │   ├── scheduler.py            # APScheduler background jobs
 │   ├── services/
 │   │   ├── meetalfred_client.py  # MeetAlfred integration
-│   │   └── ai_service.py         # Gemini integration
+│   │   └── ai_service.py         # Claude (Anthropic) integration
 │   ├── requirements.txt
 │   ├── Procfile                # Start command for Railway
 │   └── .env.example
@@ -127,7 +127,7 @@ Create a `backend/.env` file (see `.env.example`):
 
 ```env
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/meetalfred_db
-GEMINI_API_KEY=your_gemini_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
 ```
 
 Run:
@@ -170,7 +170,7 @@ The frontend will be available at `http://localhost:3000`.
 3. Add the PostgreSQL plugin
 4. Variables:
    - `DATABASE_URL` (auto-injected by the PostgreSQL plugin)
-   - `GEMINI_API_KEY`
+   - `ANTHROPIC_API_KEY`
 
 ### Frontend (Vercel)
 1. Import the Git repository
@@ -200,7 +200,7 @@ The logic lives in `app/lib/AuthContext.tsx`; the `DEMO_MODE` flag in `app/lib/d
 | GET | `/analytics/recent-replies` | Recent replies |
 | GET | `/analytics/campaign-sequence` | Message sequence in a campaign |
 | GET | `/analytics/template-conversions` | Template conversion rates |
-| GET | `/analytics/ai-insights` | AI insight from Gemini |
+| GET | `/analytics/ai-insights` | AI insight from Claude |
 | GET | `/crm/leads` | List of leads with filters |
 | GET | `/crm/leads/{id}` | Lead detail |
 | GET | `/crm/leads/{id}/activities` | Lead activity history |
