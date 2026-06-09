@@ -3,9 +3,28 @@ import json
 import decimal
 import httpx
 
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
+DEFAULT_MODEL = "claude-3-5-haiku-latest"
+
+
+def _get_api_key() -> str:
+    key = os.getenv("ANTHROPIC_API_KEY") or os.getenv("CLAUDE_API_KEY") or ""
+    return key.strip().strip('"').strip("'")
+
+
+def _get_model() -> str:
+    return (os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL).strip()
+
+
+def _parse_api_error(response: httpx.Response) -> str:
+    try:
+        data = response.json()
+        err = data.get("error") or {}
+        if isinstance(err, dict):
+            return err.get("message") or str(err)
+        return str(err)
+    except Exception:
+        return response.text[:300]
 
 
 def generate_profiles_insight(profiles_data: list, total_leads: int, total_actions: int) -> str:
@@ -15,8 +34,9 @@ def generate_profiles_insight(profiles_data: list, total_leads: int, total_actio
     if not profiles_data:
         return "Not enough data available for the selected period to generate meaningful insights."
 
-    if not ANTHROPIC_API_KEY:
-        return "AI insights are not configured. Set ANTHROPIC_API_KEY on the backend."
+    api_key = _get_api_key()
+    if not api_key:
+        return "AI insights are not configured. Add ANTHROPIC_API_KEY in Railway backend variables and redeploy."
 
     class DecimalEncoder(json.JSONEncoder):
         def default(self, o):
@@ -45,26 +65,44 @@ Please provide a concise, actionable insight (2-3 sentences max) highlighting:
 
 Keep it professional, direct, and use markdown formatting (e.g. bolding) for key metrics and names. Do not include any introductory or concluding fluff like "Here is the insight". Just return the analytical text."""
 
+    model = _get_model()
+
     try:
         response = httpx.post(
             ANTHROPIC_API_URL,
             headers={
-                "x-api-key": ANTHROPIC_API_KEY,
+                "x-api-key": api_key,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json",
             },
             json={
-                "model": ANTHROPIC_MODEL,
+                "model": model,
                 "max_tokens": 1024,
                 "messages": [{"role": "user", "content": prompt}],
             },
             timeout=60.0,
         )
-        response.raise_for_status()
+
+        if response.status_code >= 400:
+            detail = _parse_api_error(response)
+            print(f"Anthropic API error ({response.status_code}, model={model}): {detail}")
+            if response.status_code == 401:
+                return "AI authentication failed. Check ANTHROPIC_API_KEY in Railway (no quotes, redeploy after saving)."
+            if response.status_code == 404:
+                return f"AI model not found ({model}). Set ANTHROPIC_MODEL=claude-3-5-haiku-latest in Railway."
+            return f"AI service error: {detail}"
+
         payload = response.json()
         blocks = payload.get("content") or []
         text_parts = [block.get("text", "") for block in blocks if block.get("type") == "text"]
-        return "\n".join(part for part in text_parts if part).strip() or "Unable to generate insights at this moment. Please try again later."
+        text = "\n".join(part for part in text_parts if part).strip()
+        if text:
+            return text
+        print(f"Anthropic API returned empty content: {payload}")
+        return "AI returned an empty response. Please try again."
+    except httpx.TimeoutException:
+        print("Anthropic API timeout")
+        return "AI request timed out. Please try again."
     except Exception as e:
         print(f"Error generating AI insight: {e}")
         return "Unable to generate insights at this moment. Please try again later."
