@@ -72,7 +72,6 @@ function AuthBadge() {
 
 export default function Header() {
     const router = useRouter();
-    const { role } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -97,6 +96,10 @@ export default function Header() {
             setIsSyncing(Boolean(res.data.in_progress));
             return res.data;
         } catch {
+            try {
+                const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/last-sync`);
+                setLastSync(res.data.last_synced_at ?? null);
+            } catch {}
             return null;
         }
     }, []);
@@ -134,7 +137,7 @@ export default function Header() {
     };
 
     const handleManualSync = async () => {
-        if (isSyncing || role !== 'admin') return;
+        if (isSyncing) return;
         setSyncError(null);
         setIsSyncing(true);
         try {
@@ -273,8 +276,8 @@ export default function Header() {
     };
 
     return (
-        <header className="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/50 px-6 py-4 flex items-center justify-between sticky top-0 z-40">
-            <div className="relative w-full max-w-md" ref={searchRef}>
+        <header className="bg-slate-800/80 backdrop-blur-md border-b border-slate-700/50 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-40">
+            <div className="relative flex-1 min-w-0 max-w-md" ref={searchRef}>
                 <Search className="absolute left-3.5 top-1/2 transform -translate-y-1/2 text-slate-400 pointer-events-none" size={18} />
                 {searchLoading && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
@@ -322,34 +325,30 @@ export default function Header() {
                 )}
             </div>
 
-            <div className="flex items-center gap-4">
-                {/* Last sync + manual sync (admin) */}
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-1.5 whitespace-nowrap">
-                        <RefreshCw size={12} className={`${isSyncing ? 'animate-spin text-indigo-400' : 'text-emerald-400'}`} />
-                        <span className="text-slate-500">Last sync:</span>
-                        <span className="text-slate-300 font-medium">
-                            {lastSync ? formatSync(lastSync) : 'Never'}
-                        </span>
-                    </div>
-                    {role === 'admin' && (
-                        <button
-                            type="button"
-                            onClick={handleManualSync}
-                            disabled={isSyncing}
-                            title={isSyncing ? 'Sync in progress…' : 'Sync data from MeetAlfred'}
-                            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
-                        >
-                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
-                            {isSyncing ? 'Syncing…' : 'Sync now'}
-                        </button>
-                    )}
-                    {syncError && (
-                        <span className="text-[10px] text-rose-400 max-w-[120px] truncate" title={syncError}>
-                            {syncError}
-                        </span>
-                    )}
+            <div className="flex items-center gap-3 shrink-0">
+                {/* Last sync + sync button */}
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/40 border border-slate-700/50 rounded-lg pl-1.5 pr-2 py-1 whitespace-nowrap">
+                    <button
+                        type="button"
+                        onClick={handleManualSync}
+                        disabled={isSyncing}
+                        title={isSyncing ? 'Sync in progress…' : 'Sync data from MeetAlfred'}
+                        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-indigo-300 hover:bg-indigo-500/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        <RefreshCw size={13} className={isSyncing ? 'animate-spin text-indigo-400' : 'text-emerald-400'} />
+                        <span className="font-semibold text-slate-200">{isSyncing ? 'Syncing…' : 'Sync'}</span>
+                    </button>
+                    <span className="text-slate-600">|</span>
+                    <span className="text-slate-500">Last:</span>
+                    <span className="text-slate-300 font-medium">
+                        {lastSync ? formatSync(lastSync) : 'Never'}
+                    </span>
                 </div>
+                {syncError && (
+                    <span className="text-[10px] text-rose-400 max-w-[100px] truncate hidden lg:inline" title={syncError}>
+                        {syncError}
+                    </span>
+                )}
 
                 <div className="h-6 w-px bg-slate-700"></div>
 
