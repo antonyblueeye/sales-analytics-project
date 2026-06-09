@@ -1,6 +1,6 @@
 'use client';
 import { Search, Bell, RefreshCw, Sparkles, X, Clock, ChevronDown, ChevronUp, User, LogOut } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/AuthContext';
 import axios from 'axios';
@@ -72,6 +72,7 @@ function AuthBadge() {
 
 export default function Header() {
     const router = useRouter();
+    const { role } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
     const [searchOpen, setSearchOpen] = useState(false);
@@ -80,17 +81,79 @@ export default function Header() {
     const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [lastSync, setLastSync] = useState<string | null>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncError, setSyncError] = useState<string | null>(null);
+    const syncPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
     const [insights, setInsights] = useState<InsightEntry[]>([]);
     const [lastReadAt, setLastReadAt] = useState<number>(0);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const panelRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/analytics/last-sync`)
-            .then(res => setLastSync(res.data.last_synced_at))
-            .catch(() => {});
+    const fetchSyncStatus = useCallback(async () => {
+        try {
+            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/sync/status`);
+            setLastSync(res.data.last_synced_at ?? null);
+            setIsSyncing(Boolean(res.data.in_progress));
+            return res.data;
+        } catch {
+            return null;
+        }
     }, []);
+
+    useEffect(() => {
+        fetchSyncStatus().then((status) => {
+            if (status?.in_progress) {
+                startSyncPolling();
+            }
+        });
+    }, [fetchSyncStatus]);
+
+    useEffect(() => {
+        return () => {
+            if (syncPollRef.current) clearInterval(syncPollRef.current);
+        };
+    }, []);
+
+    const stopSyncPolling = () => {
+        if (syncPollRef.current) {
+            clearInterval(syncPollRef.current);
+            syncPollRef.current = null;
+        }
+    };
+
+    const startSyncPolling = () => {
+        stopSyncPolling();
+        syncPollRef.current = setInterval(async () => {
+            const status = await fetchSyncStatus();
+            if (status && !status.in_progress) {
+                stopSyncPolling();
+                setIsSyncing(false);
+            }
+        }, 3000);
+    };
+
+    const handleManualSync = async () => {
+        if (isSyncing || role !== 'admin') return;
+        setSyncError(null);
+        setIsSyncing(true);
+        try {
+            const res = await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/sync/run`);
+            if (res.data.status === 'already_running') {
+                startSyncPolling();
+                return;
+            }
+            if (res.data.status === 'started') {
+                startSyncPolling();
+                return;
+            }
+            setIsSyncing(false);
+            setSyncError('Could not start sync');
+        } catch {
+            setIsSyncing(false);
+            setSyncError('Sync request failed');
+        }
+    };
 
     // Search debounce
     useEffect(() => {
@@ -260,14 +323,33 @@ export default function Header() {
             </div>
 
             <div className="flex items-center gap-4">
-                {/* Last sync */}
-                {lastSync && (
+                {/* Last sync + manual sync (admin) */}
+                <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-1.5 whitespace-nowrap">
-                        <RefreshCw size={12} className="text-emerald-400" />
+                        <RefreshCw size={12} className={`${isSyncing ? 'animate-spin text-indigo-400' : 'text-emerald-400'}`} />
                         <span className="text-slate-500">Last sync:</span>
-                        <span className="text-slate-300 font-medium">{formatSync(lastSync)}</span>
+                        <span className="text-slate-300 font-medium">
+                            {lastSync ? formatSync(lastSync) : 'Never'}
+                        </span>
                     </div>
-                )}
+                    {role === 'admin' && (
+                        <button
+                            type="button"
+                            onClick={handleManualSync}
+                            disabled={isSyncing}
+                            title={isSyncing ? 'Sync in progress…' : 'Sync data from MeetAlfred'}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-indigo-300 bg-indigo-500/10 border border-indigo-500/30 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 py-1.5 transition-colors whitespace-nowrap"
+                        >
+                            <RefreshCw size={12} className={isSyncing ? 'animate-spin' : ''} />
+                            {isSyncing ? 'Syncing…' : 'Sync now'}
+                        </button>
+                    )}
+                    {syncError && (
+                        <span className="text-[10px] text-rose-400 max-w-[120px] truncate" title={syncError}>
+                            {syncError}
+                        </span>
+                    )}
+                </div>
 
                 <div className="h-6 w-px bg-slate-700"></div>
 

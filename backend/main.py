@@ -2,14 +2,14 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from fastapi import FastAPI, Depends, Query
+from fastapi import FastAPI, Depends, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text, and_, func
 from sqlalchemy.orm import Session, Mapped, mapped_column
 from database import engine, get_db
 from services.meetalfred_client import sync_campaigns
-from scheduler import start_scheduler
+from scheduler import start_scheduler, run_sync_all_job, is_sync_in_progress
 from models import Base, Campaign, Profile, Lead, Action
 from analytics import get_total_actions, get_total_leads, get_profiles_summary, get_campaigns_summary, get_campaigns_list, get_campaign_history, get_recent_replies, get_funnel_history
 from typing import Optional
@@ -120,9 +120,27 @@ def get_profiles(db: Session = Depends(get_db)):
 # браузерной строке
 @app.post("/sync-all")
 def sync_all(db: Session = Depends(get_db)):
-    from services.meetalfred_client import sync_all_profiles_data
-    result = sync_all_profiles_data(db)
-    return {"status": "ok", "results": result}
+    """Synchronous full sync (for /docs or scripts). Prefer POST /sync/run from UI."""
+    return run_sync_all_job()
+
+
+@app.post("/sync/run")
+def trigger_sync(background_tasks: BackgroundTasks):
+    """Start full sync in the background. Returns immediately."""
+    if is_sync_in_progress():
+        return {"status": "already_running"}
+    background_tasks.add_task(run_sync_all_job)
+    return {"status": "started"}
+
+
+@app.get("/sync/status")
+def sync_status(db: Session = Depends(get_db)):
+    last = db.query(func.max(Action.last_synced_at)).scalar()
+    return {
+        "in_progress": is_sync_in_progress(),
+        "last_synced_at": last.isoformat() if last else None,
+    }
+
 
 @app.get("/analytics/last-sync")
 def last_sync(db: Session = Depends(get_db)):
