@@ -325,27 +325,25 @@ export default function Header() {
                 )}
             </div>
 
-            <div className="flex items-center gap-3 shrink-0">
-                {/* Last sync + sync button */}
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/40 border border-slate-700/50 rounded-lg pl-1.5 pr-2 py-1 whitespace-nowrap">
-                    <button
-                        type="button"
-                        onClick={handleManualSync}
-                        disabled={isSyncing}
-                        title={isSyncing ? 'Sync in progress…' : 'Sync data from MeetAlfred'}
-                        className="flex items-center gap-1.5 px-2 py-1 rounded-md text-indigo-300 hover:bg-indigo-500/15 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        <RefreshCw size={13} className={isSyncing ? 'animate-spin text-indigo-400' : 'text-emerald-400'} />
-                        <span className="font-semibold text-slate-200">{isSyncing ? 'Syncing…' : 'Sync'}</span>
-                    </button>
-                    <span className="text-slate-600">|</span>
-                    <span className="text-slate-500">Last:</span>
-                    <span className="text-slate-300 font-medium">
+            <div className="flex items-center gap-2 shrink-0">
+                <button
+                    type="button"
+                    onClick={handleManualSync}
+                    disabled={isSyncing}
+                    title="Download latest data from MeetAlfred"
+                    className="flex items-center gap-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-900 disabled:text-indigo-300 disabled:cursor-wait rounded-lg px-3 py-2 shadow-md shadow-indigo-900/40 transition-colors whitespace-nowrap"
+                >
+                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                    {isSyncing ? 'Syncing…' : 'Sync now'}
+                </button>
+                <div className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2 whitespace-nowrap">
+                    <span className="text-slate-500">Last sync:</span>
+                    <span className="text-slate-200 font-medium">
                         {lastSync ? formatSync(lastSync) : 'Never'}
                     </span>
                 </div>
                 {syncError && (
-                    <span className="text-[10px] text-rose-400 max-w-[100px] truncate hidden lg:inline" title={syncError}>
+                    <span className="text-[10px] text-rose-400 max-w-[120px] truncate" title={syncError}>
                         {syncError}
                     </span>
                 )}
