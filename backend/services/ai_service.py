@@ -4,7 +4,19 @@ import decimal
 import httpx
 
 ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
-DEFAULT_MODEL = "claude-3-5-haiku-latest"
+DEFAULT_MODEL = "claude-haiku-4-5"
+FALLBACK_MODELS = (
+    "claude-haiku-4-5-20251001",
+    "claude-sonnet-4-6",
+)
+
+# Retired aliases — ignore if set via env
+DEPRECATED_MODELS = frozenset({
+    "claude-3-5-haiku-latest",
+    "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-20241022",
+    "claude-3-5-sonnet-20241022",
+})
 
 
 def _get_api_key() -> str:
@@ -13,7 +25,36 @@ def _get_api_key() -> str:
 
 
 def _get_model() -> str:
-    return (os.getenv("ANTHROPIC_MODEL") or DEFAULT_MODEL).strip()
+    env_model = (os.getenv("ANTHROPIC_MODEL") or "").strip()
+    if env_model and env_model not in DEPRECATED_MODELS:
+        return env_model
+    return DEFAULT_MODEL
+
+
+def _models_to_try() -> list[str]:
+    primary = _get_model()
+    chain = [primary]
+    for model in FALLBACK_MODELS:
+        if model not in chain:
+            chain.append(model)
+    return chain
+
+
+def _call_anthropic(api_key: str, model: str, prompt: str) -> httpx.Response:
+    return httpx.post(
+        ANTHROPIC_API_URL,
+        headers={
+            "x-api-key": api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        },
+        json={
+            "model": model,
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": prompt}],
+        },
+        timeout=60.0,
+    )
 
 
 def _parse_api_error(response: httpx.Response) -> str:
@@ -65,23 +106,19 @@ Please provide a concise, actionable insight (2-3 sentences max) highlighting:
 
 Keep it professional, direct, and use markdown formatting (e.g. bolding) for key metrics and names. Do not include any introductory or concluding fluff like "Here is the insight". Just return the analytical text."""
 
-    model = _get_model()
-
     try:
-        response = httpx.post(
-            ANTHROPIC_API_URL,
-            headers={
-                "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": model,
-                "max_tokens": 1024,
-                "messages": [{"role": "user", "content": prompt}],
-            },
-            timeout=60.0,
-        )
+        response = None
+        last_detail = ""
+        for model in _models_to_try():
+            response = _call_anthropic(api_key, model, prompt)
+            if response.status_code == 404:
+                last_detail = _parse_api_error(response)
+                print(f"Anthropic model not found ({model}): {last_detail}")
+                continue
+            break
+
+        if response is None:
+            return "Unable to generate insights at this moment. Please try again later."
 
         if response.status_code >= 400:
             detail = _parse_api_error(response)
@@ -89,7 +126,7 @@ Keep it professional, direct, and use markdown formatting (e.g. bolding) for key
             if response.status_code == 401:
                 return "AI authentication failed. Check ANTHROPIC_API_KEY in Railway (no quotes, redeploy after saving)."
             if response.status_code == 404:
-                return f"AI model not found ({model}). Set ANTHROPIC_MODEL=claude-3-5-haiku-latest in Railway."
+                return f"AI model not found. Remove ANTHROPIC_MODEL from Railway or set ANTHROPIC_MODEL=claude-haiku-4-5"
             return f"AI service error: {detail}"
 
         payload = response.json()
